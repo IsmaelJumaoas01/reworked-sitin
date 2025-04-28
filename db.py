@@ -211,6 +211,56 @@ def init_db():
             )
         """)
         
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS LABORATORIES (
+                LAB_ID INT AUTO_INCREMENT PRIMARY KEY,
+                LAB_NAME VARCHAR(50) NOT NULL,
+                STATUS ENUM('active', 'inactive') DEFAULT 'active',
+                CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS COMPUTERS (
+                COMPUTER_ID INT AUTO_INCREMENT PRIMARY KEY,
+                LAB_ID INT NOT NULL,
+                COMPUTER_NUMBER INT NOT NULL,
+                STATUS ENUM('available', 'in_use', 'maintenance') DEFAULT 'available',
+                CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (LAB_ID) REFERENCES LABORATORIES(LAB_ID),
+                UNIQUE KEY unique_computer (LAB_ID, COMPUTER_NUMBER)
+            )
+        """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS PURPOSES (
+                PURPOSE_ID INT AUTO_INCREMENT PRIMARY KEY,
+                PURPOSE_NAME VARCHAR(100) NOT NULL,
+                STATUS ENUM('active', 'inactive') DEFAULT 'active',
+                CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS SIT_IN_RECORDS (
+                RECORD_ID INT AUTO_INCREMENT PRIMARY KEY,
+                USER_IDNO VARCHAR(20) NOT NULL,
+                LAB_ID INT NOT NULL,
+                COMPUTER_ID INT NOT NULL,
+                PURPOSE_ID INT NOT NULL,
+                DATE DATE NOT NULL,
+                TIME_IN TIME NOT NULL,
+                TIME_OUT TIME,
+                STATUS ENUM('PENDING', 'APPROVED', 'DENIED', 'COMPLETED') DEFAULT 'PENDING',
+                SESSION ENUM('ON_GOING', 'COMPLETED') DEFAULT 'ON_GOING',
+                CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (USER_IDNO) REFERENCES USERS(IDNO),
+                FOREIGN KEY (LAB_ID) REFERENCES LABORATORIES(LAB_ID),
+                FOREIGN KEY (COMPUTER_ID) REFERENCES COMPUTERS(COMPUTER_ID),
+                FOREIGN KEY (PURPOSE_ID) REFERENCES PURPOSES(PURPOSE_ID)
+            )
+        """)
+        
         # Add points system tables
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS STUDENT_POINTS (
@@ -249,62 +299,12 @@ def init_db():
         """)
         
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS LABORATORIES (
-                LAB_ID INT AUTO_INCREMENT PRIMARY KEY,
-                LAB_NAME VARCHAR(50) NOT NULL,
-                STATUS ENUM('active', 'inactive') DEFAULT 'active',
-                CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS COMPUTERS (
-                COMPUTER_ID INT AUTO_INCREMENT PRIMARY KEY,
-                LAB_ID INT NOT NULL,
-                COMPUTER_NUMBER INT NOT NULL,
-                STATUS ENUM('available', 'in_use', 'maintenance') DEFAULT 'available',
-                CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (LAB_ID) REFERENCES LABORATORIES(LAB_ID),
-                UNIQUE KEY unique_computer (LAB_ID, COMPUTER_NUMBER)
-            )
-        """)
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS PURPOSES (
-                PURPOSE_ID INT AUTO_INCREMENT PRIMARY KEY,
-                PURPOSE_NAME VARCHAR(100) NOT NULL,
-                STATUS ENUM('active', 'inactive') DEFAULT 'active',
-                CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
-        cursor.execute("""
             CREATE TABLE IF NOT EXISTS SIT_IN_LIMITS (
                 LIMIT_ID INT AUTO_INCREMENT PRIMARY KEY,
                 USER_IDNO VARCHAR(20) NOT NULL,
                 SIT_IN_COUNT INT DEFAULT 0,
                 MAX_SIT_INS INT NOT NULL,
                 FOREIGN KEY (USER_IDNO) REFERENCES USERS(IDNO)
-            )
-        """)
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS SIT_IN_RECORDS (
-                RECORD_ID INT AUTO_INCREMENT PRIMARY KEY,
-                USER_IDNO VARCHAR(20) NOT NULL,
-                LAB_ID INT NOT NULL,
-                COMPUTER_ID INT NOT NULL,
-                PURPOSE_ID INT NOT NULL,
-                DATE DATE NOT NULL,
-                TIME_IN TIME NOT NULL,
-                TIME_OUT TIME,
-                STATUS ENUM('PENDING', 'APPROVED', 'DENIED', 'COMPLETED') DEFAULT 'PENDING',
-                SESSION ENUM('ON_GOING', 'COMPLETED') DEFAULT 'ON_GOING',
-                CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (USER_IDNO) REFERENCES USERS(IDNO),
-                FOREIGN KEY (LAB_ID) REFERENCES LABORATORIES(LAB_ID),
-                FOREIGN KEY (COMPUTER_ID) REFERENCES COMPUTERS(COMPUTER_ID),
-                FOREIGN KEY (PURPOSE_ID) REFERENCES PURPOSES(PURPOSE_ID)
             )
         """)
         
