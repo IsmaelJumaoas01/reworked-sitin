@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Feedback History - Sit-In Management System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="page-title">My Feedback History</h2>
+        </div>
+    </div>
+
+    <!-- Feedback List -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">All Feedback</h5>
+                </div>
+                <div class="card-body">
+                    {% if feedbacks %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Lab</th>
+                                    <th>Purpose</th>
+                                    <th>Rating</th>
+                                    <th>Comment</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for feedback in feedbacks %}
+                                <tr>
+                                    <td>{{ feedback.SIT_IN_DATE }}</td>
+                                    <td>{{ feedback.LAB_NAME }}</td>
+                                    <td>{{ feedback.PURPOSE_NAME }}</td>
+                                    <td>
+                                        <div class="rating">
+                                            {% for i in range(5) %}
+                                            <i class="fas fa-star {% if i < feedback.RATING %}text-warning{% else %}text-muted{% endif %}"></i>
+                                            {% endfor %}
+                                        </div>
+                                    </td>
+                                    <td>{{ feedback.COMMENT }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    {% if total_pages > 1 %}
+                    <nav aria-label="Page navigation" class="mt-4">
+                        <ul class="pagination justify-content-center">
+                            <li class="page-item {% if page == 1 %}disabled{% endif %}">
+                                <a class="page-link" href="{{ url_for('student.feedback_history', page=page-1) }}">Previous</a>
+                            </li>
+                            {% for p in range(1, total_pages + 1) %}
+                            <li class="page-item {% if p == page %}active{% endif %}">
+                                <a class="page-link" href="{{ url_for('student.feedback_history', page=p) }}">{{ p }}</a>
+                            </li>
+                            {% endfor %}
+                            <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+                                <a class="page-link" href="{{ url_for('student.feedback_history', page=page+1) }}">Next</a>
+                            </li>
+                        </ul>
+                    </nav>
+                    {% endif %}
+                    {% else %}
+                    <p class="text-muted">No feedback found.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.rating {
+    display: inline-block;
+}
+
+.rating .fa-star {
+    font-size: 1.1rem;
+}
+
+.rating .text-warning {
+    color: #f6c23e !important;
+}
+
+.rating .text-muted {
+    color: #d1d3e2 !important;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize any necessary event listeners or functionality here
+    console.log('Feedback history page loaded');
+});
+</script>
+{% endblock %} 

@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block title %}Student Profile - Sit-In Management System{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card profile-card">
+                <div class="card-body text-center">
+                    <div class="profile-picture-container mb-4">
+                        <img src="{{ url_for('student.get_profile_picture', idno=student.IDNO) }}" 
+                             alt="Profile Picture" 
+                             class="profile-picture"
+                             id="profilePreview">
+                        <div class="profile-picture-overlay">
+                            <label for="profilePicture" class="btn btn-light btn-sm">
+                                <i class="fas fa-camera"></i>
+                            </label>
+                        </div>
+                    </div>
+                    <h4>{{ student.FIRSTNAME }} {{ student.LASTNAME }}</h4>
+                    <p class="text-muted">{{ student.IDNO }}</p>
+                    <p class="text-muted">{{ student.COURSE }} - Year {{ student.YEAR }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Edit Profile</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('student.update_profile') }}" enctype="multipart/form-data" class="needs-validation" novalidate>
+                        <input type="file" id="profilePicture" name="profile_picture" accept="image/*" style="display: none;">
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="lastname" class="form-label">Last Name</label>
+                                    <input type="text" class="form-control" id="lastname" name="lastname" value="{{ student.LASTNAME }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="firstname" class="form-label">First Name</label>
+                                    <input type="text" class="form-control" id="firstname" name="firstname" value="{{ student.FIRSTNAME }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="middlename" class="form-label">Middle Name</label>
+                                    <input type="text" class="form-control" id="middlename" name="middlename" value="{{ student.MIDDLENAME }}">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="course" class="form-label">Course</label>
+                                    <select class="form-select" id="course" name="course" required>
+                                        <option value="">Select Course</option>
+                                        <option value="BSIT" {% if student.COURSE == 'BSIT' %}selected{% endif %}>Bachelor of Science in Information Technology</option>
+                                        <option value="BSCS" {% if student.COURSE == 'BSCS' %}selected{% endif %}>Bachelor of Science in Computer Science</option>
+                                        <option value="BSCRIM" {% if student.COURSE == 'BSCRIM' %}selected{% endif %}>Bachelor of Science in Criminology</option>
+                                        <option value="BSA" {% if student.COURSE == 'BSA' %}selected{% endif %}>Bachelor of Science in Accountancy</option>
+                                        <option value="BSBA" {% if student.COURSE == 'BSBA' %}selected{% endif %}>Bachelor of Science in Business Administration</option>
+                                        <option value="BSN" {% if student.COURSE == 'BSN' %}selected{% endif %}>Bachelor of Science in Nursing</option>
+                                        <option value="BEED" {% if student.COURSE == 'BEED' %}selected{% endif %}>Bachelor of Elementary Education</option>
+                                        <option value="BSED" {% if student.COURSE == 'BSED' %}selected{% endif %}>Bachelor of Secondary Education</option>
+                                        <option value="BSA" {% if student.COURSE == 'BSA' %}selected{% endif %}>Bachelor of Science in Architecture</option>
+                                        <option value="BSCE" {% if student.COURSE == 'BSCE' %}selected{% endif %}>Bachelor of Science in Civil Engineering</option>
+                                        <option value="BSEE" {% if student.COURSE == 'BSEE' %}selected{% endif %}>Bachelor of Science in Electrical Engineering</option>
+                                        <option value="BSME" {% if student.COURSE == 'BSME' %}selected{% endif %}>Bachelor of Science in Mechanical Engineering</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="year" class="form-label">Year Level</label>
+                                    <select class="form-select" id="year" name="year" required>
+                                        <option value="">Select Year</option>
+                                        <option value="1" {% if student.YEAR == 1 %}selected{% endif %}>1st Year</option>
+                                        <option value="2" {% if student.YEAR == 2 %}selected{% endif %}>2nd Year</option>
+                                        <option value="3" {% if student.YEAR == 3 %}selected{% endif %}>3rd Year</option>
+                                        <option value="4" {% if student.YEAR == 4 %}selected{% endif %}>4th Year</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" name="email" value="{{ student.EMAIL }}" required>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <h6 class="mb-3">Change Password</h6>
+                        <div class="form-group mb-3">
+                            <label for="current_password" class="form-label">Current Password</label>
+                            <input type="password" class="form-control" id="current_password" name="current_password">
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="new_password" class="form-label">New Password</label>
+                            <input type="password" class="form-control" id="new_password" name="new_password" minlength="8">
+                            <div class="invalid-feedback">
+                                Password must be at least 8 characters long.
+                            </div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="confirm_password" class="form-label">Confirm New Password</label>
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password">
+                            <div class="invalid-feedback">
+                                Passwords do not match.
+                            </div>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Save Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.profile-card {
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.profile-picture-container {
+    position: relative;
+    width: 150px;
+    height: 150px;
+    margin: 0 auto;
+}
+
+.profile-picture {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.profile-picture-overlay {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    padding: 5px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.profile-picture-overlay:hover {
+    background: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(78, 115, 223, 0.1);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color) 0%, #224abe 100%);
+    border: none;
+    padding: 0.75rem;
+    border-radius: 10px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(78, 115, 223, 0.3);
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Form validation
+(function () {
+    'use strict'
+    var forms = document.querySelectorAll('.needs-validation')
+    Array.prototype.slice.call(forms).forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            if (!form.checkValidity()) {
+                event.preventDefault()
+                event.stopPropagation()
+            }
+            form.classList.add('was-validated')
+        }, false)
+    })
+})()
+
+// Profile picture preview
+document.getElementById('profilePicture').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('profilePreview').src = e.target.result;
+        }
+        reader.readAsDataURL(file);
+    }
+});
+
+// Password validation
+document.getElementById('confirm_password').addEventListener('input', function() {
+    const newPassword = document.getElementById('new_password').value;
+    const confirmPassword = this.value;
+    
+    if (newPassword !== confirmPassword) {
+        this.setCustomValidity('Passwords do not match');
+    } else {
+        this.setCustomValidity('');
+    }
+});
+
+document.getElementById('new_password').addEventListener('input', function() {
+    const confirmPassword = document.getElementById('confirm_password');
+    if (confirmPassword.value) {
+        if (this.value !== confirmPassword.value) {
+            confirmPassword.setCustomValidity('Passwords do not match');
+        } else {
+            confirmPassword.setCustomValidity('');
+        }
+    }
+});
+</script>
+{% endblock %} 

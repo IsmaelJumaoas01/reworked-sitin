@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+
+{% block title %}Staff Dashboard - Sit-In Management System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Welcome Section -->
+    <div class="welcome-section mb-4">
+        <div class="welcome-content">
+            <h2>Welcome, {{ session.get('name') }}!</h2>
+            <p class="text-muted">Here's your sit-in management overview</p>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title text-white">Active Sit-Ins</h5>
+                    <h2 class="card-text text-white">{{ stats.active_sit_ins }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title text-white">Total Labs</h5>
+                    <h2 class="card-text text-white">{{ stats.total_labs }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title text-white">Total Purposes</h5>
+                    <h2 class="card-text text-white">{{ stats.total_purposes }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h5 class="card-title text-white">Total Students</h5>
+                    <h2 class="card-text text-white">{{ stats.total_students }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Lab Usage Statistics</h5>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-download"></i> Download
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('staff.download_report', report_type='lab_usage', format='csv') }}">CSV</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('staff.download_report', report_type='lab_usage', format='pdf') }}">PDF</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('staff.download_report', report_type='lab_usage', format='excel') }}">Excel</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <canvas id="labUsageChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Purpose Usage Statistics</h5>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-download"></i> Download
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('staff.download_report', report_type='purpose_usage', format='csv') }}">CSV</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('staff.download_report', report_type='purpose_usage', format='pdf') }}">PDF</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('staff.download_report', report_type='purpose_usage', format='excel') }}">Excel</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <canvas id="purposeUsageChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Sit-Ins -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Recent Sit-Ins</h5>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-download"></i> Download
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('staff.download_report', report_type='sit_ins', format='csv') }}">CSV</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('staff.download_report', report_type='sit_ins', format='pdf') }}">PDF</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('staff.download_report', report_type='sit_ins', format='excel') }}">Excel</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if recent_sit_ins %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Lab</th>
+                                    <th>Purpose</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sit_in in recent_sit_ins %}
+                                <tr>
+                                    <td>{{ sit_in.student_name }}</td>
+                                    <td>{{ sit_in.lab_name }}</td>
+                                    <td>{{ sit_in.purpose_name }}</td>
+                                    <td>{{ sit_in.date }}</td>
+                                    <td>
+                                        <span class="badge {% if sit_in.status == 'COMPLETED' %}bg-success{% elif sit_in.status == 'PENDING' %}bg-warning{% elif sit_in.status == 'DENIED' %}bg-danger{% else %}bg-info{% endif %}">
+                                            {{ sit_in.status }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('staff.view_sit_in', record_id=sit_in.record_id) }}" class="btn btn-sm btn-info">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No recent sit-ins found.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.welcome-section {
+    background: linear-gradient(135deg, var(--primary-color) 0%, #224abe 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 15px;
+    margin-bottom: 2rem;
+}
+
+.card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+}
+
+.card-header {
+    background: white;
+    border-bottom: 1px solid #e3e6f0;
+    padding: 1rem 1.25rem;
+}
+
+.badge {
+    padding: 0.5em 0.75em;
+    font-weight: 500;
+}
+
+.dropdown-menu {
+    border: none;
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+}
+
+.dropdown-item {
+    padding: 0.5rem 1rem;
+}
+
+.dropdown-item:hover {
+    background-color: #f8f9fc;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Lab Usage Chart
+    const labCtx = document.getElementById('labUsageChart').getContext('2d');
+    const labLabels = JSON.parse('{{ lab_labels|tojson|safe }}');
+    const labData = JSON.parse('{{ lab_data|tojson|safe }}');
+    
+    new Chart(labCtx, {
+        type: 'pie',
+        data: {
+            labels: labLabels,
+            datasets: [{
+                data: labData,
+                backgroundColor: [
+                    '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b',
+                    '#5a5c69', '#858796', '#6f42c1', '#fd7e14', '#20c9a6'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'right'
+                },
+                title: {
+                    display: true,
+                    text: 'Lab Usage Distribution'
+                }
+            }
+        }
+    });
+
+    // Purpose Usage Chart
+    const purposeCtx = document.getElementById('purposeUsageChart').getContext('2d');
+    const purposeLabels = JSON.parse('{{ purpose_labels|tojson|safe }}');
+    const purposeData = JSON.parse('{{ purpose_data|tojson|safe }}');
+    
+    new Chart(purposeCtx, {
+        type: 'pie',
+        data: {
+            labels: purposeLabels,
+            datasets: [{
+                data: purposeData,
+                backgroundColor: [
+                    '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b',
+                    '#5a5c69', '#858796', '#6f42c1', '#fd7e14', '#20c9a6'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'right'
+                },
+                title: {
+                    display: true,
+                    text: 'Purpose Usage Distribution'
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %} 

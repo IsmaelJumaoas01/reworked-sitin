@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block title %}Top Sit-In Participants - Sit-In Management System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="page-title">Top Sit-In Participants</h2>
+        </div>
+    </div>
+
+    <!-- Top 5 Participants -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0 text-white">
+                        <i class="fas fa-trophy me-2 text-white"></i>Top 5 Participants
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Student Name</th>
+                                    <th>Course</th>
+                                    <th>Current Points</th>
+                                    <th>Total Points</th>
+                                    <th>Last Updated</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for participant in top_participants %}
+                                <tr>
+                                    <td>
+                                        {% if loop.index == 1 %}
+                                        <i class="fas fa-crown text-warning"></i>
+                                        {% elif loop.index == 2 %}
+                                        <i class="fas fa-medal text-secondary"></i>
+                                        {% elif loop.index == 3 %}
+                                        <i class="fas fa-award text-danger"></i>
+                                        {% else %}
+                                        {{ loop.index }}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ participant.FIRSTNAME }} {{ participant.LASTNAME }}</td>
+                                    <td>{{ participant.COURSE }}</td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ participant.CURRENT_POINTS }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ participant.TOTAL_POINTS }}</span>
+                                    </td>
+                                    <td>{{ participant.LAST_UPDATED }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- All Participants -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0 text-white">
+                        <i class="fas fa-users me-2 text-white"></i>All Participants
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="allParticipantsTable">
+                            <thead>
+                                <tr>
+                                    <th>Student Name</th>
+                                    <th>Course</th>
+                                    <th>Current Points</th>
+                                    <th>Total Points</th>
+                                    <th>Last Updated</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for participant in all_participants %}
+                                <tr>
+                                    <td>{{ participant.FIRSTNAME }} {{ participant.LASTNAME }}</td>
+                                    <td>{{ participant.COURSE }}</td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ participant.CURRENT_POINTS }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ participant.TOTAL_POINTS }}</span>
+                                    </td>
+                                    <td>{{ participant.LAST_UPDATED }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-info" onclick="viewPointHistory('{{ participant.IDNO }}')">
+                                            <i class="fas fa-history"></i> History
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Point History Modal -->
+<div class="modal fade" id="pointHistoryModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white">
+                    <i class="fas fa-history me-2 text-white"></i>Point History
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="pointHistoryContent">
+                    <!-- Point history will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function viewPointHistory(studentId) {
+    fetch(`/staff/point-history/${studentId}`)
+        .then(response => response.json())
+        .then(data => {
+            const content = document.getElementById('pointHistoryContent');
+            content.innerHTML = `
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Points Change</th>
+                                <th>Reason</th>
+                                <th>Added By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.history.map(record => `
+                                <tr>
+                                    <td>${record.CREATED_AT}</td>
+                                    <td>
+                                        <span class="badge bg-${record.POINTS_CHANGE > 0 ? 'success' : 'danger'}">
+                                            ${record.POINTS_CHANGE > 0 ? '+' : ''}${record.POINTS_CHANGE}
+                                        </span>
+                                    </td>
+                                    <td>${record.REASON}</td>
+                                    <td>${record.ADDED_BY_NAME}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            const modal = new bootstrap.Modal(document.getElementById('pointHistoryModal'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to load point history');
+        });
+}
+
+// Initialize DataTable
+$(document).ready(function() {
+    $('#allParticipantsTable').DataTable({
+        order: [[2, 'desc']], // Sort by current points by default
+        pageLength: 10,
+        language: {
+            search: "Search participants:"
+        }
+    });
+});
+</script>
+{% endblock %} 

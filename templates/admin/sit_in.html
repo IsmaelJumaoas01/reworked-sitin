@@ -1,0 +1,980 @@
+{% extends "base.html" %}
+
+{% block title %}Sit-In Management - Sit-In Management System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-4 text-gray-800">Sit-In Management</h1>
+    
+    <!-- Today's Sit-Ins -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Today's Sit-Ins</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="todaySitInsTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>Student ID</th>
+                            <th>Name</th>
+                            <th>Lab</th>
+                            <th>Purpose</th>
+                            <th>Time In</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sit_in in today_sit_ins %}
+                        <tr>
+                            <td>{{ sit_in.USER_IDNO }}</td>
+                            <td>{{ sit_in.FIRSTNAME }} {{ sit_in.LASTNAME }}</td>
+                            <td>{{ sit_in.LAB_NAME }}</td>
+                            <td>{{ sit_in.PURPOSE_NAME }}</td>
+                            <td>{{ sit_in.TIME_IN }}</td>
+                            <td>
+                                <span class="badge bg-{{ 'success' if sit_in.SESSION == 'ON_GOING' else 'secondary' }}">
+                                    {{ sit_in.SESSION }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if sit_in.SESSION == 'ON_GOING' %}
+                                <button class="btn btn-danger btn-sm end-sit-in" data-record-id="{{ sit_in.RECORD_ID }}">
+                                    <i class="fas fa-stop"></i> End
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Search -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0 text-white">
+                        <i class="fas fa-search me-2 text-white"></i>Search Student
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="searchForm" class="row g-3">
+                        <div class="col-md-8">
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="studentId" placeholder="Enter Student ID Number" required>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search me-2"></i>Search
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                    <!-- Loading Spinner -->
+                    <div id="searchLoading" class="text-center mt-3" style="display: none;">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Searching student information...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Information -->
+    <div id="studentInfo" class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0 text-white">
+                        <i class="fas fa-user-graduate me-2 text-white"></i>Student Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="info-group mb-3">
+                                <label class="text-muted">Name</label>
+                                <h5 id="studentName" class="mb-0">-</h5>
+                            </div>
+                            <div class="info-group mb-3">
+                                <label class="text-muted">Course</label>
+                                <h5 id="studentCourse" class="mb-0">-</h5>
+                            </div>
+                            <div class="info-group mb-3">
+                                <label class="text-muted">Year</label>
+                                <h5 id="studentYear" class="mb-0">-</h5>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-group mb-3">
+                                <label class="text-muted">Remaining Sit-In Sessions</label>
+                                <h5><span id="remainingSessions" class="badge bg-secondary fs-6">-</span></h5>
+                            </div>
+                            <div class="info-group mb-3">
+                                <label class="text-muted">Current Points</label>
+                                <h5><span id="currentPoints" class="badge bg-primary fs-6">-</span></h5>
+                            </div>
+                            <div class="info-group mb-3">
+                                <label class="text-muted">Status</label>
+                                <h5><span id="studentStatus" class="badge bg-secondary fs-6">-</span></h5>
+                            </div>
+                            <div class="mt-4">
+                                <button id="startSitInBtn" class="btn btn-success w-100" data-bs-toggle="modal" data-bs-target="#startSitInModal" disabled>
+                                    <i class="fas fa-play me-2"></i>Start Sit-In
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Sit-Ins -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0 text-white">
+                            <i class="fas fa-chair me-2 text-white"></i>Active Sit-Ins
+                        </h5>
+                        <a href="{{ url_for('admin.top_participants') }}" class="btn btn-light btn-sm">
+                            <i class="fas fa-trophy me-2"></i>Top Participants
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Student Name</th>
+                                    <th>Lab</th>
+                                    <th>Computer</th>
+                                    <th>Purpose</th>
+                                    <th>Time In</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="activeSitInsTable">
+                                <!-- Active sit-ins will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Start Sit-In Modal -->
+<div class="modal fade" id="startSitInModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-play me-2"></i>Start Sit-In Session
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="startSitInForm">
+                    <input type="hidden" id="studentIdno">
+                    <div class="mb-3">
+                        <label for="labSelect" class="form-label">Select Lab</label>
+                        <select class="form-select" id="labSelect" required onchange="loadComputers(this.value)">
+                            <option value="">Choose a lab...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="computerSelect" class="form-label">Select Computer</label>
+                        <select class="form-select" id="computerSelect" required>
+                            <option value="">Choose a computer...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="purposeSelect" class="form-label">Select Purpose</label>
+                        <select class="form-select" id="purposeSelect" required>
+                            <option value="">Choose a purpose...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Sit-in Method</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="sitInMethod" id="usePoints" value="points">
+                            <label class="form-check-label" for="usePoints">
+                                Use Points (3 points required)
+                                <small class="text-muted d-block">Available points: <span id="availablePoints">-</span></small>
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="sitInMethod" id="useCount" value="count" checked>
+                            <label class="form-check-label" for="useCount">
+                                Use Sit-in Count
+                                <small class="text-muted d-block">Remaining sessions: <span id="remainingSessionsCount">-</span></small>
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmStartSitIn">Start Session</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Give Points Modal -->
+<div class="modal fade" id="givePointsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-star me-2"></i>Give Points
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="givePointsForm">
+                    <input type="hidden" id="pointsStudentId">
+                    <div class="mb-3">
+                        <label class="form-label">Student</label>
+                        <input type="text" class="form-control" id="pointsStudentName" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="pointsAmount" class="form-label">Points to Give</label>
+                        <input type="number" class="form-control" id="pointsAmount" min="1" value="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="pointsReason" class="form-label">Reason</label>
+                        <textarea class="form-control" id="pointsReason" rows="3" required></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirmGivePoints">Give Points</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load labs and purposes
+    loadLabs();
+    loadPurposes();
+    // Load active sit-ins immediately and then every 30 seconds
+    loadActiveSitIns();
+    setInterval(loadActiveSitIns, 30000);
+
+    // Search form submission
+    document.getElementById('searchForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const studentId = document.getElementById('studentId').value;
+        searchStudent(studentId);
+    });
+
+    // Start sit-in button click
+    document.getElementById('confirmStartSitIn').addEventListener('click', function() {
+        startSitIn();
+    });
+
+    // End Sit-In
+    $(document).on('click', '.end-sit-in', function() {
+        const recordId = $(this).data('record-id');
+        if (confirm('Are you sure you want to end this sit-in session?')) {
+            $.ajax({
+                url: `/admin/end-sit-in/${recordId}`,
+                type: 'POST',
+                success: function(response) {
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        alert(response.message);
+                    }
+                },
+                error: function(xhr) {
+                    alert(xhr.responseJSON.message || 'Error ending sit-in session');
+                }
+            });
+        }
+    });
+});
+
+function loadLabs() {
+    fetch('/admin/api/labs', {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Failed to fetch labs');
+        }
+        return response.json();
+    })
+    .then(data => {
+        const labSelect = document.getElementById('labSelect');
+        labSelect.innerHTML = '<option value="">Choose a lab...</option>';
+        
+        data.forEach(lab => {
+            const option = document.createElement('option');
+            option.value = lab.LAB_ID;
+            option.textContent = lab.LAB_NAME;
+            labSelect.appendChild(option);
+        });
+    })
+    .catch(error => {
+        console.error('Error loading labs:', error);
+        showToast('Error', 'Failed to load labs', 'error');
+    });
+}
+
+function loadPurposes() {
+    fetch('/admin/api/purposes', {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Failed to fetch purposes');
+        }
+        return response.json();
+    })
+    .then(data => {
+        const purposeSelect = document.getElementById('purposeSelect');
+        purposeSelect.innerHTML = '<option value="">Choose a purpose...</option>';
+        
+        data.forEach(purpose => {
+            const option = document.createElement('option');
+            option.value = purpose.PURPOSE_ID;
+            option.textContent = purpose.PURPOSE_NAME;
+            purposeSelect.appendChild(option);
+        });
+    })
+    .catch(error => {
+        console.error('Error loading purposes:', error);
+        showToast('Error', 'Failed to load purposes', 'error');
+    });
+}
+
+function searchStudent(studentId) {
+    // Show loading spinner
+    const loadingSpinner = document.getElementById('searchLoading');
+    if (loadingSpinner) {
+        loadingSpinner.style.display = 'block';
+    }
+
+    // Clear previous data
+    document.getElementById('studentName').textContent = '-';
+    document.getElementById('studentCourse').textContent = '-';
+    document.getElementById('studentYear').textContent = '-';
+    document.getElementById('remainingSessions').textContent = '-';
+    document.getElementById('remainingSessions').className = 'badge bg-secondary fs-6';
+    document.getElementById('currentPoints').textContent = '-';
+    document.getElementById('currentPoints').className = 'badge bg-secondary fs-6';
+    document.getElementById('studentStatus').textContent = '-';
+    document.getElementById('studentStatus').className = 'badge bg-secondary fs-6';
+    document.getElementById('startSitInBtn').disabled = true;
+
+    // Validate student ID
+    if (!studentId || studentId.trim() === '') {
+        showToast('Error', 'Please enter a valid student ID', 'error');
+        if (loadingSpinner) {
+            loadingSpinner.style.display = 'none';
+        }
+        return;
+    }
+
+    fetch(`/admin/student/${studentId}`, {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            if (response.status === 401) {
+                window.location.href = '/login';
+                throw new Error('Session expired. Please log in again.');
+            }
+            return response.json().then(data => {
+                throw new Error(data.error || 'Failed to fetch student information');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Received data:', data);
+
+        if (data.error) {
+            showToast('Error', data.error, 'error');
+            return;
+        }
+
+        // Update student information
+        document.getElementById('studentName').textContent = `${data.FIRSTNAME} ${data.LASTNAME}`;
+        document.getElementById('studentCourse').textContent = data.COURSE;
+        document.getElementById('studentYear').textContent = data.YEAR;
+        document.getElementById('remainingSessions').textContent = data.remaining_sessions;
+        document.getElementById('remainingSessions').className = 'badge bg-primary fs-6';
+        document.getElementById('currentPoints').textContent = data.current_points;
+        document.getElementById('currentPoints').className = 'badge bg-primary fs-6';
+        document.getElementById('studentStatus').textContent = data.STATUS;
+        document.getElementById('studentStatus').className = `badge bg-${data.STATUS === 'active' ? 'success' : 'danger'} fs-6`;
+        document.getElementById('studentIdno').value = data.IDNO;
+        document.getElementById('availablePoints').textContent = data.current_points;
+        document.getElementById('remainingSessionsCount').textContent = data.remaining_sessions;
+
+        // Enable/disable start sit-in button
+        const startSitInBtn = document.getElementById('startSitInBtn');
+        if (data.STATUS === 'active' && (data.remaining_sessions > 0 || data.current_points >= 3)) {
+            startSitInBtn.disabled = false;
+        } else {
+            startSitInBtn.disabled = true;
+            if (data.remaining_sessions <= 0 && data.current_points < 3) {
+                showToast('Error', 'No remaining sit-in sessions and insufficient points', 'error');
+            } else if (data.STATUS !== 'active') {
+                showToast('Error', 'Student account is not active', 'error');
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showToast('Error', error.message || 'Failed to fetch student information', 'error');
+    })
+    .finally(() => {
+        if (loadingSpinner) {
+            loadingSpinner.style.display = 'none';
+        }
+    });
+}
+
+function loadComputers(labId) {
+    if (!labId) {
+        document.getElementById('computerSelect').innerHTML = '<option value="">Choose a computer...</option>';
+        return;
+    }
+
+    fetch(`/admin/api/computers/${labId}`, {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Failed to fetch computers');
+        }
+        return response.json();
+    })
+    .then(data => {
+        const computerSelect = document.getElementById('computerSelect');
+        computerSelect.innerHTML = '<option value="">Choose a computer...</option>';
+        
+        data.forEach(computer => {
+            const option = document.createElement('option');
+            option.value = computer.COMPUTER_ID;
+            option.textContent = `Computer ${computer.COMPUTER_NUMBER}`;
+            computerSelect.appendChild(option);
+        });
+    })
+    .catch(error => {
+        console.error('Error loading computers:', error);
+        showToast('Error', 'Failed to load computers', 'error');
+    });
+}
+
+function startSitIn() {
+    const studentIdno = document.getElementById('studentIdno').value;
+    const labId = document.getElementById('labSelect').value;
+    const computerId = document.getElementById('computerSelect').value;
+    const purposeId = document.getElementById('purposeSelect').value;
+    const usePoints = document.getElementById('usePoints').checked;
+
+    if (!labId || !computerId || !purposeId) {
+        showToast('Error', 'Please fill in all required fields', 'error');
+        return;
+    }
+
+    fetch('/admin/start-sit-in', {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            student_idno: studentIdno,
+            lab_id: labId,
+            computer_id: computerId,
+            purpose_id: purposeId,
+            use_points: usePoints
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Failed to start sit-in session');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            showToast('Success', 'Sit-in session started successfully', 'success');
+            document.getElementById('startSitInModal').querySelector('.btn-close').click();
+            loadActiveSitIns();
+            searchStudent(studentIdno); // Refresh student info
+        } else {
+            showToast('Error', data.message || 'Failed to start sit-in session', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error starting sit-in:', error);
+        showToast('Error', 'Failed to start sit-in session', 'error');
+    });
+}
+
+function loadActiveSitIns() {
+    fetch('/admin/active-sit-ins', {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Failed to fetch active sit-ins');
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Active sit-ins data:', data); // Debug log
+        const tableBody = document.getElementById('activeSitInsTable');
+        tableBody.innerHTML = '';
+
+        if (!data || data.length === 0) {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td colspan="6" class="text-center">No active sit-in sessions</td>
+            `;
+            tableBody.appendChild(row);
+            return;
+        }
+
+        data.forEach(sitIn => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${sitIn.FIRSTNAME} ${sitIn.LASTNAME}</td>
+                <td>${sitIn.LAB_NAME}</td>
+                <td>Computer ${sitIn.COMPUTER_NUMBER}</td>
+                <td>${sitIn.PURPOSE_NAME}</td>
+                <td>${sitIn.CREATED_AT}</td>
+                <td>
+                    <button class="btn btn-warning btn-sm" onclick="endSitIn(${sitIn.RECORD_ID})">
+                        <i class="fas fa-stop"></i> End Session
+                    </button>
+                    <button class="btn btn-success btn-sm ms-2" onclick="givePoints('${sitIn.USER_IDNO}', '${sitIn.FIRSTNAME} ${sitIn.LASTNAME}')">
+                        <i class="fas fa-star"></i> Give Points
+                    </button>
+                </td>
+            `;
+            tableBody.appendChild(row);
+        });
+    })
+    .catch(error => {
+        console.error('Error loading active sit-ins:', error);
+        showToast('Error', 'Failed to load active sit-ins', 'error');
+    });
+}
+
+function endSitIn(recordId) {
+    if (confirm('Are you sure you want to end this sit-in session?')) {
+        fetch(`/admin/end-sit-in/${recordId}`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to end sit-in session');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                showToast('Success', 'Sit-in session ended successfully', 'success');
+                loadActiveSitIns();
+                // Refresh student info if it's currently displayed
+                const studentId = document.getElementById('studentId').value;
+                if (studentId) {
+                    searchStudent(studentId);
+                }
+            } else {
+                showToast('Error', data.message || 'Failed to end sit-in session', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error ending sit-in:', error);
+            showToast('Error', 'Failed to end sit-in session', 'error');
+        });
+    }
+}
+
+function givePoints(studentId, studentName) {
+    document.getElementById('pointsStudentId').value = studentId;
+    document.getElementById('pointsStudentName').value = studentName;
+    document.getElementById('pointsAmount').value = 1;
+    document.getElementById('pointsReason').value = '';
+    
+    const modal = new bootstrap.Modal(document.getElementById('givePointsModal'));
+    modal.show();
+}
+
+document.getElementById('confirmGivePoints').addEventListener('click', function() {
+    const studentId = document.getElementById('pointsStudentId').value;
+    const points = document.getElementById('pointsAmount').value;
+    const reason = document.getElementById('pointsReason').value;
+    
+    if (!points || !reason) {
+        showToast('Error', 'Please fill in all fields', 'error');
+        return;
+    }
+    
+    fetch('/admin/add-points', {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            student_id: studentId,
+            points: parseInt(points),
+            reason: reason
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Failed to add points');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            showToast('Success', 'Points added successfully', 'success');
+            document.getElementById('givePointsModal').querySelector('.btn-close').click();
+            // Refresh student info if it's currently displayed
+            const studentId = document.getElementById('studentId').value;
+            if (studentId) {
+                searchStudent(studentId);
+            }
+        } else {
+            showToast('Error', data.message || 'Failed to add points', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error adding points:', error);
+        showToast('Error', 'Failed to add points', 'error');
+    });
+});
+
+function showToast(title, message, type) {
+    const toastContainer = document.querySelector('.toast-container') || (() => {
+        const container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+        return container;
+    })();
+
+    const toast = document.createElement('div');
+    toast.className = `toast bg-${type}`;
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+    
+    const icon = type === 'success' ? 'check-circle' :
+                type === 'error' ? 'exclamation-circle' :
+                type === 'warning' ? 'exclamation-triangle' :
+                'info-circle';
+    
+    toast.innerHTML = `
+        <div class="toast-header">
+            <i class="fas fa-${icon} toast-icon"></i>
+            <strong class="me-auto">${title}</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body">
+            ${message}
+        </div>
+    `;
+    
+    toastContainer.appendChild(toast);
+    const bsToast = new bootstrap.Toast(toast, {
+        autohide: true,
+        delay: 5000
+    });
+    bsToast.show();
+    
+    toast.addEventListener('hidden.bs.toast', function() {
+        toastContainer.removeChild(toast);
+        if (toastContainer.children.length === 0) {
+            document.body.removeChild(toastContainer);
+        }
+    });
+}
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<style>
+/* Table Styles */
+.table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #212529;
+    border-bottom: 2px solid #dee2e6;
+    padding: 12px;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+}
+
+.table td {
+    vertical-align: middle;
+    padding: 12px;
+    color: #212529;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+/* Toast Styles */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1050;
+}
+
+.toast {
+    min-width: 300px;
+    background: white;
+    border: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    margin-bottom: 10px;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.toast-header {
+    border-bottom: none;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+}
+
+.toast-body {
+    padding: 12px 16px;
+    color: #333;
+    font-size: 0.95rem;
+    background: white;
+}
+
+.toast.bg-success {
+    background: white;
+    border-left: 4px solid #28a745;
+}
+
+.toast.bg-success .toast-header {
+    background-color: #28a745;
+    color: white;
+}
+
+.toast.bg-success .toast-body {
+    color: #333;
+}
+
+.toast.bg-error {
+    background: white;
+    border-left: 4px solid #dc3545;
+}
+
+.toast.bg-error .toast-header {
+    background-color: #dc3545;
+    color: white;
+}
+
+.toast.bg-error .toast-body {
+    color: #333;
+}
+
+.toast.bg-warning {
+    background: white;
+    border-left: 4px solid #ffc107;
+}
+
+.toast.bg-warning .toast-header {
+    background-color: #ffc107;
+    color: #333;
+}
+
+.toast.bg-warning .toast-body {
+    color: #333;
+}
+
+.toast.bg-info {
+    background: white;
+    border-left: 4px solid #17a2b8;
+}
+
+.toast.bg-info .toast-header {
+    background-color: #17a2b8;
+    color: white;
+}
+
+.toast.bg-info .toast-body {
+    color: #333;
+}
+
+.toast .btn-close {
+    filter: brightness(0) invert(1);
+    opacity: 0.8;
+}
+
+.toast.bg-warning .btn-close {
+    filter: none;
+}
+
+.toast-icon {
+    margin-right: 8px;
+    font-size: 1.2em;
+}
+
+/* Rest of your existing styles */
+.info-group {
+    padding: 15px;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+    border: 1px solid #e9ecef;
+}
+
+.info-group:hover {
+    background-color: #e9ecef;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.info-group label {
+    font-size: 0.875rem;
+    margin-bottom: 8px;
+    display: block;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.info-group h5 {
+    color: #212529;
+    font-weight: 500;
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.badge {
+    padding: 8px 12px;
+    font-weight: 500;
+    font-size: 0.9rem;
+    border-radius: 6px;
+}
+
+.badge.bg-success {
+    background-color: #28a745 !important;
+}
+
+.badge.bg-danger {
+    background-color: #dc3545 !important;
+}
+
+.badge.bg-primary {
+    background-color: #0d6efd !important;
+}
+
+.badge.bg-secondary {
+    background-color: #6c757d !important;
+}
+
+.card {
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.card-header {
+    border-bottom: none;
+    padding: 1rem;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+.btn {
+    padding: 10px 20px;
+    font-weight: 500;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+#searchLoading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1000;
+}
+
+.spinner-border {
+    width: 3rem;
+    height: 3rem;
+    border-width: 0.25em;
+}
+</style>
+{% endblock %} 

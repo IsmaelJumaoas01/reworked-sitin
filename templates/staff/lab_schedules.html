@@ -1,0 +1,406 @@
+{% extends "base.html" %}
+
+{% block title %}Lab Schedules{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-4 text-gray-800">Lab Schedules</h1>
+    
+    <!-- Add Schedule Form -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Add New Schedule</h6>
+        </div>
+        <div class="card-body">
+            <form id="addScheduleForm" class="row g-3">
+                <div class="col-md-3">
+                    <label for="lab" class="form-label">Laboratory</label>
+                    <select class="form-select" id="lab" name="lab_id" required>
+                        <option value="">Select Laboratory</option>
+                        {% for lab in labs %}
+                        <option value="{{ lab.LAB_ID }}">{{ lab.LAB_NAME }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="purpose" class="form-label">Purpose</label>
+                    <select class="form-select" id="purpose" name="purpose_id" required>
+                        <option value="">Select Purpose</option>
+                        {% for purpose in purposes %}
+                        <option value="{{ purpose.PURPOSE_ID }}">{{ purpose.PURPOSE_NAME }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="day" class="form-label">Day of Week</label>
+                    <select class="form-select" id="day" name="day" required>
+                        <option value="">Select Day</option>
+                        <option value="Monday">Monday</option>
+                        <option value="Tuesday">Tuesday</option>
+                        <option value="Wednesday">Wednesday</option>
+                        <option value="Thursday">Thursday</option>
+                        <option value="Friday">Friday</option>
+                        <option value="Saturday">Saturday</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="timeSlot" class="form-label">Time Slot</label>
+                    <select class="form-select" id="timeSlot" name="time_slot" required disabled>
+                        <option value="">Select Time Slot</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="status" class="form-label">Status</label>
+                    <select class="form-select" id="status" name="status" required>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">Add Schedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Schedule Management -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Schedule Management</h6>
+        </div>
+        <div class="card-body">
+            <!-- Week View -->
+            <div class="accordion" id="weekAccordion">
+                {% for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] %}
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="heading{{ day }}">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ day }}" aria-expanded="false" aria-controls="collapse{{ day }}">
+                            {{ day }}
+                        </button>
+                    </h2>
+                    <div id="collapse{{ day }}" class="accordion-collapse collapse" aria-labelledby="heading{{ day }}" data-bs-parent="#weekAccordion">
+                        <!-- Lab Accordion -->
+                        <div class="accordion" id="labAccordion{{ day }}">
+                            {% for lab in labs %}
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="heading{{ day }}{{ lab.LAB_ID }}">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ day }}{{ lab.LAB_ID }}" aria-expanded="false" aria-controls="collapse{{ day }}{{ lab.LAB_ID }}">
+                                        {{ lab.LAB_NAME }}
+                                    </button>
+                                </h2>
+                                <div id="collapse{{ day }}{{ lab.LAB_ID }}" class="accordion-collapse collapse" aria-labelledby="heading{{ day }}{{ lab.LAB_ID }}" data-bs-parent="#labAccordion{{ day }}">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm mb-0">
+                                            <thead class="bg-light">
+                                                <tr>
+                                                    <th>Time</th>
+                                                    <th>Purpose</th>
+                                                    <th>Status</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for schedule in schedules if schedule.DAY_OF_WEEK == day and schedule.LAB_ID == lab.LAB_ID %}
+                                                <tr>
+                                                    <td>
+                                                        <small>{{ schedule.START_TIME }} - {{ schedule.END_TIME }}</small>
+                                                    </td>
+                                                    <td>
+                                                        <small>{{ schedule.PURPOSE_NAME }}</small>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-{{ 'success' if schedule.STATUS == 'active' else 'danger' }}">
+                                                            {{ schedule.STATUS }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div class="btn-group btn-group-sm">
+                                                            <button class="btn btn-info edit-schedule" data-schedule-id="{{ schedule.SCHEDULE_ID }}"
+                                                                    data-lab-id="{{ schedule.LAB_ID }}"
+                                                                    data-purpose-id="{{ schedule.PURPOSE_ID }}"
+                                                                    data-day="{{ schedule.DAY_OF_WEEK }}"
+                                                                    data-start-time="{{ schedule.START_TIME }}"
+                                                                    data-end-time="{{ schedule.END_TIME }}"
+                                                                    data-status="{{ schedule.STATUS }}">
+                                                                <i class="fas fa-edit"></i>
+                                                            </button>
+                                                            <button class="btn btn-danger delete-schedule" data-schedule-id="{{ schedule.SCHEDULE_ID }}">
+                                                                <i class="fas fa-trash"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Debug logging function
+function debugLog(message, data = null) {
+    const timestamp = new Date().toISOString();
+    if (data) {
+        console.log(`[${timestamp}] ${message}:`, data);
+    } else {
+        console.log(`[${timestamp}] ${message}`);
+    }
+}
+
+// Store all time slots globally
+let allTimeSlots = [];
+
+// Load all time slots when the page loads
+function loadAllTimeSlots() {
+    debugLog('Loading all time slots...');
+    fetch('/staff/get-all-time-slots')
+        .then(response => {
+            debugLog('Time slots response status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            debugLog('All time slots loaded:', data);
+            if (data.success) {
+                allTimeSlots = data.time_slots;
+                debugLog('Stored time slots:', allTimeSlots);
+            } else {
+                console.error('Failed to load time slots:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading time slots:', error);
+        });
+}
+
+// Filter time slots based on lab and day
+function filterTimeSlots(labId, day) {
+    debugLog('Filtering time slots:', { labId, day });
+    
+    if (!labId || !day) {
+        debugLog('Missing lab or day, disabling time slot');
+        $('#timeSlot').prop('disabled', true);
+        $('#timeSlot').html('<option value="">Select Time Slot</option>');
+        return;
+    }
+    
+    // Get available slots for the selected lab and day
+    fetch(`/staff/available-slots?lab_id=${labId}&day_of_week=${day}`)
+        .then(response => response.json())
+        .then(slots => {
+            debugLog('Available slots received:', slots);
+            
+            // Populate time slot dropdown
+            const timeSlotSelect = $('#timeSlot');
+            timeSlotSelect.empty();
+            timeSlotSelect.append('<option value="">Select Time Slot</option>');
+            
+            slots.forEach(slot => {
+                timeSlotSelect.append(`<option value="${slot.start},${slot.end}">${slot.formatted}</option>`);
+            });
+            
+            timeSlotSelect.prop('disabled', false);
+        })
+        .catch(error => {
+            console.error('Error getting available slots:', error);
+            $('#timeSlot').prop('disabled', true);
+            $('#timeSlot').html('<option value="">Error loading time slots</option>');
+        });
+}
+
+$(document).ready(function() {
+    // Load all time slots when page loads
+    loadAllTimeSlots();
+    
+    // Add Schedule Form Submission
+    $('#addScheduleForm').on('submit', function(e) {
+        e.preventDefault();
+        debugLog('Schedule form submission started');
+        
+        const formData = {
+            lab_id: $('#lab').val(),
+            purpose_id: $('#purpose').val(),
+            day: $('#day').val(),
+            start_time: $('#timeSlot').val()?.split(',')[0],
+            end_time: $('#timeSlot').val()?.split(',')[1],
+            status: $('#status').val()
+        };
+        
+        if (!formData.start_time || !formData.end_time) {
+            debugLog('Invalid time slot selection - submission blocked');
+            alert('Please select a valid time slot');
+            return;
+        }
+
+        if (!formData.lab_id || !formData.purpose_id || !formData.day) {
+            debugLog('Missing required fields - submission blocked');
+            alert('Please fill in all required fields');
+            return;
+        }
+        
+        debugLog('Submitting form data to server');
+        $.ajax({
+            url: '/staff/add-lab-schedule',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(formData),
+            success: function(response) {
+                debugLog('Server response received:', response);
+                if (response.success) {
+                    debugLog('Schedule added successfully, reloading page');
+                    location.reload();
+                } else {
+                    debugLog('Server returned error:', response.message);
+                    alert(response.message);
+                }
+            },
+            error: function(xhr) {
+                debugLog('AJAX error occurred:', {
+                    status: xhr.status,
+                    statusText: xhr.statusText,
+                    responseText: xhr.responseText
+                });
+                alert(xhr.responseJSON?.message || 'Error adding schedule');
+            }
+        });
+    });
+
+    // Lab change handler
+    $('#lab').on('change', function() {
+        const labId = $(this).val();
+        const day = $('#day').val();
+        
+        if (labId && day) {
+            filterTimeSlots(labId, day);
+        } else {
+            $('#timeSlot').prop('disabled', true);
+            $('#timeSlot').html('<option value="">Select Time Slot</option>');
+        }
+    });
+    
+    // Day change handler
+    $('#day').on('change', function() {
+        const day = $(this).val();
+        const labId = $('#lab').val();
+        
+        if (labId && day) {
+            filterTimeSlots(labId, day);
+        } else {
+            $('#timeSlot').prop('disabled', true);
+            $('#timeSlot').html('<option value="">Select Time Slot</option>');
+        }
+    });
+
+    // Edit Schedule
+    $('.edit-schedule').on('click', function() {
+        debugLog('Edit button clicked');
+        const scheduleId = $(this).data('schedule-id');
+        const labId = $(this).data('lab-id');
+        const purposeId = $(this).data('purpose-id');
+        const day = $(this).data('day');
+        const startTime = $(this).data('start-time');
+        const endTime = $(this).data('end-time');
+        const status = $(this).data('status');
+        
+        // Set the values in the form
+        $('#lab').val(labId);
+        $('#purpose').val(purposeId);
+        $('#day').val(day);
+        $('#status').val(status);
+        
+        // Filter time slots for the selected lab and day
+        filterTimeSlots(labId, day);
+        
+        // Scroll to the form
+        $('html, body').animate({
+            scrollTop: $('#addScheduleForm').offset().top - 100
+        }, 500);
+    });
+    
+    // Delete Schedule
+    $('.delete-schedule').on('click', function() {
+        debugLog('Delete button clicked');
+        if (confirm('Are you sure you want to delete this schedule?')) {
+            const scheduleId = $(this).data('schedule-id');
+            debugLog('Deleting schedule:', scheduleId);
+            
+            $.ajax({
+                url: `/staff/delete-lab-schedule/${scheduleId}`,
+                type: 'DELETE',
+                success: function(response) {
+                    debugLog('Delete response:', response);
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        alert(response.message);
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Delete error:', xhr);
+                    alert(xhr.responseJSON.message || 'Error deleting schedule');
+                }
+            });
+        }
+    });
+});
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.accordion-button:not(.collapsed) {
+    background-color: #4e73df;
+    color: white;
+}
+.accordion-button:focus {
+    box-shadow: none;
+    border-color: rgba(0,0,0,.125);
+}
+.accordion-item {
+    border: 1px solid rgba(0,0,0,.125);
+}
+.accordion-body {
+    background-color: #f8f9fc;
+}
+.table-sm td {
+    padding: 0.5rem;
+}
+.badge {
+    font-size: 0.8em;
+    padding: 0.4em 0.6em;
+}
+.btn-group-sm .btn {
+    padding: 0.25rem 0.5rem;
+}
+.modal-body {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+.time-slot {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.time-slot:hover {
+    background-color: #f8f9fc;
+}
+.time-slot.active {
+    background-color: #4e73df;
+    color: white;
+}
+.list-group-item {
+    border: 1px solid rgba(0,0,0,.125);
+    margin-bottom: 0.25rem;
+}
+</style>
+{% endblock %} 

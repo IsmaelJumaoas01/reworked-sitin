@@ -1,0 +1,418 @@
+{% extends "base.html" %}
+
+{% block title %}Student Dashboard - Sit-In Management System{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Welcome Section -->
+    <div class="welcome-section mb-4">
+        <div class="welcome-content">
+            <h2 class="text-white">Welcome, {{ session.get('name') }}!</h2>
+            <p class="text-white-50">Here's your sit-in management overview</p>
+        </div>
+        <div class="welcome-bg"></div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="stats-card primary">
+                <div class="stats-icon">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stats-info">
+                    <h5 class="text-white">Remaining Sit-Ins</h5>
+                    <h2 class="text-white">{{ remaining_sessions }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card success">
+                <div class="stats-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stats-info">
+                    <h5 class="text-white">Active Sit-Ins</h5>
+                    <h2 class="text-white">{{ stats.active_sit_ins }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card info">
+                <div class="stats-icon">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+                <div class="stats-info">
+                    <h5 class="text-white">Total Sit-Ins</h5>
+                    <h2 class="text-white">{{ stats.total_sit_ins }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="stats-card primary">
+                <div class="stats-icon">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stats-info">
+                    <h5 class="text-white">Sit-In Limit</h5>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h2 class="mb-0 text-white">{{ sit_in_limit }}/{{ max_sit_ins }}</h2>
+                        <div class="progress" style="width: 60%; height: 8px;">
+                            <div class="progress-bar" role="progressbar" 
+                                 data-width="{{ (sit_in_limit / max_sit_ins) * 100 }}"
+                                 aria-valuenow="{{ sit_in_limit }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="{{ max_sit_ins }}">
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-white-50 mb-0">Remaining: {{ max_sit_ins - sit_in_limit }} sessions</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="stats-card actions">
+                <div class="stats-info">
+                    <h5 class="text-white">Quick Actions</h5>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <a href="{{ url_for('sit_in.request_sit_in') }}" class="action-btn primary">
+                                <i class="fas fa-plus"></i>
+                                <span>Request New Sit-In</span>
+                            </a>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <a href="{{ url_for('sit_in.sit_in_history') }}" class="action-btn secondary">
+                                <i class="fas fa-history"></i>
+                                <span>View History</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Sit-Ins -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="content-card">
+                <div class="card-header">
+                    <h5 class="mb-0 text-white">Active Sit-Ins</h5>
+                </div>
+                <div class="card-body">
+                    {% if active_sit_ins %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Lab</th>
+                                    <th>Purpose</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sit_in in active_sit_ins %}
+                                <tr>
+                                    <td>{{ sit_in.lab_name }}</td>
+                                    <td>{{ sit_in.purpose_name }}</td>
+                                    <td>{{ sit_in.date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>
+                                        <span class="status-badge {{ 'success' if sit_in.status == 'APPROVED' else 'warning' }}">
+                                            {{ sit_in.status }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if sit_in.session == 'ON_GOING' %}
+                                        <a href="{{ url_for('sit_in.end_sit_in', record_id=sit_in.record_id) }}" 
+                                           class="btn btn-warning btn-sm"
+                                           onclick="return confirm('Are you sure you want to end this sit-in session?')">
+                                            <i class="fas fa-stop"></i> End Session
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-clipboard-list"></i>
+                        <p>No active sit-ins at the moment.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Announcements -->
+    <div class="row">
+        <div class="col-12">
+            <div class="content-card">
+                <div class="card-header">
+                    <h5 class="mb-0 text-white">Recent Announcements</h5>
+                </div>
+                <div class="card-body">
+                    {% if announcements %}
+                    <div class="announcements-list">
+                        {% for announcement in announcements %}
+                        <div class="announcement-item">
+                            <div class="announcement-icon">
+                                <i class="fas fa-bullhorn"></i>
+                            </div>
+                            <div class="announcement-content">
+                                <h6>{{ announcement.title }}</h6>
+                                <p>{{ announcement.content }}</p>
+                                <small class="text-muted">
+                                    Posted by {{ announcement.firstname }} {{ announcement.lastname }} 
+                                    on {{ announcement.DATE_POSTED }}
+                                </small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-bullhorn"></i>
+                        <p>No announcements yet.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.dashboard-container {
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: calc(100vh - 60px);
+}
+
+.welcome-section {
+    position: relative;
+    background: linear-gradient(135deg, var(--primary-color) 0%, #224abe 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 15px;
+    overflow: hidden;
+}
+
+.welcome-content {
+    position: relative;
+    z-index: 1;
+}
+
+.welcome-bg {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="%23ffffff10" fill-opacity="1" d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,122.7C672,117,768,139,864,149.3C960,160,1056,160,1152,138.7C1248,117,1344,75,1392,53.3L1440,32L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>');
+    background-size: cover;
+    opacity: 0.1;
+}
+
+.stats-card {
+    background: white;
+    border-radius: 15px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    height: 100%;
+    transition: all 0.3s ease;
+}
+
+.stats-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+}
+
+.stats-card.primary {
+    background: linear-gradient(135deg, var(--primary-color) 0%, #224abe 100%);
+}
+
+.stats-card.success {
+    background: linear-gradient(135deg, var(--success-color) 0%, #13855c 100%);
+}
+
+.stats-card.info {
+    background: linear-gradient(135deg, var(--info-color) 0%, #258391 100%);
+}
+
+.stats-card.actions {
+    background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+}
+
+.stats-icon {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.stats-info h5 {
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.stats-info h2 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.action-btn {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    border-radius: 10px;
+    color: white;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.action-btn.primary {
+    background: linear-gradient(135deg, var(--primary-color) 0%, #224abe 100%);
+}
+
+.action-btn.secondary {
+    background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+}
+
+.action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    color: white;
+}
+
+.action-btn i {
+    font-size: 1.5rem;
+    margin-right: 1rem;
+}
+
+.content-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.content-card .card-header {
+    background: linear-gradient(135deg, var(--primary-color) 0%, #224abe 100%);
+    padding: 1rem 1.5rem;
+    border-bottom: none;
+}
+
+.content-card .card-body {
+    padding: 1.5rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: #6c757d;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.announcements-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.announcement-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.announcement-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.announcement-icon {
+    width: 40px;
+    height: 40px;
+    background: var(--primary-color);
+    color: white;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 1rem;
+}
+
+.announcement-content {
+    flex: 1;
+}
+
+.announcement-content h6 {
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.announcement-content p {
+    margin-bottom: 0.5rem;
+    color: #6c757d;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.status-badge.success {
+    background: #28a745;
+    color: white;
+}
+
+.status-badge.warning {
+    background: #ffc107;
+    color: #212529;
+}
+
+.progress {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    background-color: white;
+    transition: width 0.3s ease;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize progress bars
+    document.querySelectorAll('.progress-bar').forEach(bar => {
+        const width = bar.getAttribute('data-width');
+        bar.style.width = width + '%';
+    });
+});
+</script>
+{% endblock %} 

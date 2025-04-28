@@ -1,0 +1,519 @@
+{% extends "base.html" %}
+
+{% block title %}Add Lab Schedule{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-4 text-gray-800">Add Lab Schedule</h1>
+    
+    <!-- All Available Time Slots -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">All Available Time Slots</h6>
+        </div>
+        <div class="card-body">
+            <div class="row" id="allTimeSlotsContainer">
+                <!-- All time slots will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 1: Select Lab and Day -->
+    <div class="card shadow mb-4" id="step1">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Step 1: Select Laboratory and Day</h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="lab" class="form-label">Laboratory</label>
+                    <select class="form-select" id="lab" name="lab_id" required>
+                        <option value="">Select Laboratory</option>
+                        {% for lab in labs %}
+                        <option value="{{ lab.LAB_ID }}">{{ lab.LAB_NAME }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="day" class="form-label">Day of Week</label>
+                    <select class="form-select" id="day" name="day" required>
+                        <option value="">Select Day</option>
+                        <option value="Monday">Monday</option>
+                        <option value="Tuesday">Tuesday</option>
+                        <option value="Wednesday">Wednesday</option>
+                        <option value="Thursday">Thursday</option>
+                        <option value="Friday">Friday</option>
+                        <option value="Saturday">Saturday</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <button type="button" class="btn btn-primary" id="nextButton">Next</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 2: Select Time Slot and Purpose -->
+    <div class="card shadow mb-4" id="step2" style="display: none;">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Step 2: Select Time Slot and Purpose</h6>
+        </div>
+        <div class="card-body">
+            <form id="scheduleForm" class="row g-3">
+                <input type="hidden" id="selectedLab" name="lab_id">
+                <input type="hidden" id="selectedDay" name="day_of_week">
+                <input type="hidden" id="startTime" name="start_time">
+                <input type="hidden" id="endTime" name="end_time">
+                
+                <div class="col-md-12 mb-4">
+                    <h5>Available Time Slots for Selected Lab and Day</h5>
+                    <div class="row" id="timeSlotsContainer">
+                        <!-- Filtered time slots will be populated here -->
+                    </div>
+                </div>
+
+                <div class="col-md-12">
+                    <label for="purpose" class="form-label">Purpose</label>
+                    <select class="form-select" id="purpose" name="purpose_id" required>
+                        <option value="">Select Purpose</option>
+                        {% for purpose in purposes %}
+                        <option value="{{ purpose.PURPOSE_ID }}">{{ purpose.PURPOSE_NAME }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-12">
+                    <label for="status" class="form-label">Status</label>
+                    <select class="form-select" id="status" name="status" required>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+
+                <div class="col-12">
+                    <button type="button" class="btn btn-secondary" id="backButton">Back</button>
+                    <button type="submit" class="btn btn-primary">Save Schedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Immediately log when the script starts loading
+console.log('Script starting to load...');
+
+// Wait for the DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM Content Loaded event fired');
+    
+    // Debug logging function
+    function debugLog(message, data = null) {
+        const timestamp = new Date().toISOString();
+        if (data) {
+            console.log(`[${timestamp}] ${message}:`, data);
+        } else {
+            console.log(`[${timestamp}] ${message}`);
+        }
+    }
+
+    debugLog('Initializing page...');
+
+    // Check if containers exist
+    const allTimeSlotsContainer = document.getElementById('allTimeSlotsContainer');
+    const timeSlotsContainer = document.getElementById('timeSlotsContainer');
+    
+    debugLog('Container check:', {
+        allTimeSlotsContainer: allTimeSlotsContainer ? 'Found' : 'Not found',
+        timeSlotsContainer: timeSlotsContainer ? 'Found' : 'Not found'
+    });
+
+    // Function to show step 1
+    function showStep1() {
+        debugLog('Showing step 1');
+        document.getElementById('step1').style.display = 'block';
+        document.getElementById('step2').style.display = 'none';
+    }
+
+    // Function to show step 2
+    function showStep2() {
+        debugLog('Showing step 2');
+        document.getElementById('step1').style.display = 'none';
+        document.getElementById('step2').style.display = 'block';
+    }
+
+    // Function to handle lab and day selection
+    function handleLabDaySelection() {
+        debugLog('Handling lab and day selection');
+        
+        const labId = document.getElementById('lab').value;
+        const day = document.getElementById('day').value;
+        
+        debugLog('Selected values:', { labId, day });
+        
+        if (!labId || !day) {
+            debugLog('Validation failed: Missing lab or day');
+            alert('Please select both laboratory and day');
+            return;
+        }
+        
+        // Store selected values
+        document.getElementById('selectedLab').value = labId;
+        document.getElementById('selectedDay').value = day;
+        
+        debugLog('Stored values in hidden fields');
+        
+        // Get available time slots
+        getAvailableTimeSlots(labId, day, 'timeSlotsContainer');
+        
+        // Show step 2
+        showStep2();
+    }
+
+    // Function to get available time slots
+    function getAvailableTimeSlots(labId, day, containerId) {
+        debugLog('Getting available time slots', { labId, day, containerId });
+        
+        const container = document.getElementById(containerId);
+        if (!container) {
+            debugLog('Error: Container not found', containerId);
+            return;
+        }
+        
+        // Show loading state
+        container.innerHTML = '<div class="col-12 text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+        
+        const url = `/admin/get-available-time-slots?lab_id=${labId || ''}&day=${day || ''}`;
+        debugLog('Fetching from URL:', url);
+        
+        fetch(url)
+            .then(response => {
+                debugLog('Server response status:', response.status);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                debugLog('Received data:', data);
+                
+                container.innerHTML = '';
+                
+                if (!data.success) {
+                    debugLog('Error in response:', data.message);
+                    container.innerHTML = `
+                        <div class="col-12">
+                            <div class="alert alert-danger" role="alert">
+                                ${data.message || 'Failed to load time slots. Please try again.'}
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                if (!data.available_slots || data.available_slots.length === 0) {
+                    debugLog('No available slots found');
+                    container.innerHTML = `
+                        <div class="col-12">
+                            <div class="alert alert-info" role="alert">
+                                No available time slots found for the selected laboratory and day.
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                debugLog('Found available slots:', data.available_slots.length);
+                
+                // Group slots by duration
+                const slotsByDuration = {
+                    '1': [],
+                    '1.5': [],
+                    '2': []
+                };
+                
+                data.available_slots.forEach(slot => {
+                    const duration = slot.DURATION;
+                    if (duration === 1) {
+                        slotsByDuration['1'].push(slot);
+                    } else if (duration === 1.5) {
+                        slotsByDuration['1.5'].push(slot);
+                    } else if (duration === 2) {
+                        slotsByDuration['2'].push(slot);
+                    }
+                });
+                
+                debugLog('Slots grouped by duration:', slotsByDuration);
+                
+                // Create sections for each duration
+                Object.entries(slotsByDuration).forEach(([duration, slots]) => {
+                    if (slots.length > 0) {
+                        const section = document.createElement('div');
+                        section.className = 'slots-section';
+                        section.innerHTML = `
+                            <h6>${duration}-Hour Slots</h6>
+                            <div id="slots-table-${duration}-${containerId}"></div>
+                        `;
+                        container.appendChild(section);
+                        
+                        setTimeout(() => {
+                            const tableContainer = document.getElementById(`slots-table-${duration}-${containerId}`);
+                            if (!tableContainer) return;
+                            // Create table
+                            const table = document.createElement('table');
+                            table.className = 'table table-bordered table-hover';
+                            table.style.width = '100%';
+                            table.innerHTML = `
+                                <thead>
+                                    <tr>
+                                        <th>Start Time</th>
+                                        <th>End Time</th>
+                                        <th>Duration</th>
+                                        <th>Select</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            `;
+                            const tbody = table.querySelector('tbody');
+                            slots.forEach(slot => {
+                                const row = document.createElement('tr');
+                                // Format the time for display
+                                const startTime = new Date(`2000-01-01T${slot.START_TIME}`).toLocaleTimeString('en-US', { 
+                                    hour: 'numeric', 
+                                    minute: '2-digit', 
+                                    hour12: true 
+                                });
+                                const endTime = new Date(`2000-01-01T${slot.END_TIME}`).toLocaleTimeString('en-US', { 
+                                    hour: 'numeric', 
+                                    minute: '2-digit', 
+                                    hour12: true 
+                                });
+                                row.innerHTML = `
+                                    <td>${startTime}</td>
+                                    <td>${endTime}</td>
+                                    <td>${duration} Hour${duration !== '1' ? 's' : ''}</td>
+                                    <td><button type="button" class="btn btn-primary btn-sm select-slot-btn">Select</button></td>
+                                `;
+                                // Add click event for select button
+                                row.querySelector('.select-slot-btn').onclick = () => {
+                                    // Remove highlight from all rows
+                                    container.querySelectorAll('tr').forEach(r => r.classList.remove('table-active'));
+                                    row.classList.add('table-active');
+                                    document.getElementById('startTime').value = slot.START_TIME;
+                                    document.getElementById('endTime').value = slot.END_TIME;
+                                    document.querySelector('button[type="submit"]').disabled = false;
+                                };
+                                tbody.appendChild(row);
+                            });
+                            tableContainer.appendChild(table);
+                        }, 0);
+                    }
+                });
+            })
+            .catch(error => {
+                debugLog('Error occurred:', error);
+                container.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-danger" role="alert">
+                            Error loading time slots. Please try again.
+                        </div>
+                    </div>
+                `;
+            });
+    }
+
+    // Function to display all time slots
+    function displayAllTimeSlots() {
+        debugLog('Displaying all time slots');
+        const container = document.getElementById('allTimeSlotsContainer');
+        if (!container) {
+            debugLog('Error: Container not found');
+            return;
+        }
+        
+        container.innerHTML = `
+            <div class="col-12">
+                <div class="alert alert-info" role="alert">
+                    Please select a laboratory and day to view available time slots.
+                </div>
+            </div>
+        `;
+    }
+
+    // Add event listeners
+    const nextButton = document.getElementById('nextButton');
+    if (nextButton) {
+        debugLog('Adding click listener to Next button');
+        nextButton.addEventListener('click', function(e) {
+            debugLog('Next button clicked');
+            e.preventDefault();
+            e.stopPropagation(); // Stop event propagation
+            handleLabDaySelection();
+        });
+    } else {
+        debugLog('Error: Next button not found');
+    }
+
+    const backButton = document.getElementById('backButton');
+    if (backButton) {
+        debugLog('Adding click listener to Back button');
+        backButton.addEventListener('click', function(e) {
+            debugLog('Back button clicked');
+            e.preventDefault();
+            e.stopPropagation(); // Stop event propagation
+            showStep1();
+        });
+    } else {
+        debugLog('Error: Back button not found');
+    }
+
+    // Schedule form submission
+    const scheduleForm = document.getElementById('scheduleForm');
+    if (scheduleForm) {
+        debugLog('Adding submit listener to schedule form');
+        
+        // Initially disable the submit button
+        const submitButton = scheduleForm.querySelector('button[type="submit"]');
+        if (submitButton) {
+            submitButton.disabled = true;
+        }
+        
+        scheduleForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            debugLog('Form submitted');
+            
+            const formData = {
+                lab_id: document.getElementById('selectedLab').value,
+                purpose_id: document.getElementById('purpose').value,
+                day_of_week: document.getElementById('selectedDay').value,
+                start_time: document.getElementById('startTime').value,
+                end_time: document.getElementById('endTime').value,
+                status: document.getElementById('status').value
+            };
+            
+            debugLog('Form data:', formData);
+            
+            if (!formData.start_time || !formData.end_time) {
+                debugLog('Validation failed: No time slot selected');
+                alert('Please select a time slot');
+                return;
+            }
+            
+            if (!formData.purpose_id) {
+                debugLog('Validation failed: No purpose selected');
+                alert('Please select a purpose');
+                return;
+            }
+            
+            debugLog('Submitting schedule:', formData);
+            
+            fetch('/admin/lab-schedules/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => {
+                debugLog('Server response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                debugLog('Server response:', data);
+                if (data.success) {
+                    alert('Schedule added successfully');
+                    window.location.href = '/admin/lab-schedules';
+                } else {
+                    alert(data.message || 'Error adding schedule');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                debugLog('Error submitting form:', error);
+                alert('Error adding schedule');
+            });
+        });
+    } else {
+        debugLog('Error: Schedule form not found');
+    }
+
+    // Load all time slots initially
+    debugLog('Loading initial time slots');
+    displayAllTimeSlots();
+
+    debugLog('Page initialization complete');
+});
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.time-slot-card {
+    transition: all 0.2s ease;
+    border: 2px solid #e3e6f0;
+    margin-bottom: 1rem;
+    background-color: white;
+}
+.time-slot-card:hover {
+    border-color: #4e73df;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+.time-slot-card.selected {
+    border-color: #4e73df;
+    background-color: #4e73df;
+    color: white;
+}
+.time-slot-card.selected:hover {
+    background-color: #2e59d9;
+}
+.card-title {
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+.card-text {
+    margin-bottom: 0;
+    font-size: 0.9rem;
+}
+.slot-duration {
+    font-size: 0.8rem;
+    color: #858796;
+}
+.time-slot-card.selected .slot-duration {
+    color: rgba(255, 255, 255, 0.8);
+}
+.slots-section {
+    margin-bottom: 2rem;
+}
+.slots-section h6 {
+    color: #4e73df;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+.slots-row {
+    display: flex;
+    flex-wrap: wrap;
+    margin: -0.5rem;
+}
+.slot-col {
+    padding: 0.5rem;
+    flex: 0 0 33.333%;
+    max-width: 33.333%;
+}
+@media (max-width: 768px) {
+    .slot-col {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+}
+@media (max-width: 576px) {
+    .slot-col {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+}
+</style>
+{% endblock %} 

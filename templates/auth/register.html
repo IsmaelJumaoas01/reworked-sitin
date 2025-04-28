@@ -1,0 +1,902 @@
+{% extends "base.html" %}
+
+{% block title %}Register - Sit-In Management System{% endblock %}
+
+{% block auth_content %}
+<div class="auth-container">
+    <div class="auth-left">
+        <div class="night-sky">
+            <div class="mountains">
+                <div class="mountain-1"></div>
+                <div class="mountain-2"></div>
+                <div class="land-1"></div>
+                <div class="land-2"></div>
+                <div class="land-3"></div>
+            </div>
+            <div class="mountains-base"></div>
+            <div class="light-base"></div>
+            <div class="stars"></div>
+            <div class="stars-cross"></div>
+            <div class="stars-cross-aux"></div>
+        </div>
+        <div class="auth-content">
+            <div class="brand-logo">
+                <i class="fas fa-laptop-code"></i>
+            </div>
+            <h1 class="display-4 mb-4">Join Us!</h1>
+            <p class="lead">Create your account to start managing your sit-ins</p>
+            <div class="features mt-5">
+                <div class="feature-item">
+                    <i class="fas fa-laptop"></i>
+                    <h3>Lab Management</h3>
+                    <p>Track and manage laboratory resources</p>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-clock"></i>
+                    <h3>Time Tracking</h3>
+                    <p>Monitor sit-in sessions and usage</p>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-chart-line"></i>
+                    <h3>Analytics</h3>
+                    <p>View usage statistics and reports</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="auth-right">
+        <div class="auth-form-container">
+            <div class="form-header">
+                <h2>Student Registration</h2>
+                <p class="text-muted">Create your student account</p>
+            </div>
+            <form method="POST" action="{{ url_for('auth.register') }}" class="needs-validation" novalidate>
+                <div class="form-group">
+                    <label for="idno" class="form-label">ID Number</label>
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fas fa-id-card"></i>
+                        </span>
+                        <input type="text" class="form-control" id="idno" name="idno" required
+                               pattern="[A-Za-z0-9-]+" minlength="5"
+                               data-idno-exists-url="{{ url_for('auth.check_idno') }}"
+                               placeholder="Enter your ID number">
+                    </div>
+                    <div class="invalid-feedback">
+                        Please enter a valid ID number (at least 5 characters).
+                    </div>
+                    <div class="idno-exists-feedback text-danger" style="display: none;">
+                        This ID number is already registered.
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="lastname" class="form-label">Last Name</label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-user"></i>
+                                </span>
+                                <input type="text" class="form-control" id="lastname" name="lastname" required
+                                       placeholder="Last name">
+                            </div>
+                            <div class="invalid-feedback">
+                                Please enter your last name.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="firstname" class="form-label">First Name</label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-user"></i>
+                                </span>
+                                <input type="text" class="form-control" id="firstname" name="firstname" required
+                                       placeholder="First name">
+                            </div>
+                            <div class="invalid-feedback">
+                                Please enter your first name.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="middlename" class="form-label">Middle Name</label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-user"></i>
+                                </span>
+                                <input type="text" class="form-control" id="middlename" name="middlename"
+                                       placeholder="Middle name">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="course" class="form-label">Course</label>
+                        <select class="form-select" id="course" name="course" required>
+                            <option value="">Select Course</option>
+                            <option value="BSIT">BSIT</option>
+                            <option value="BSCS">BSCS</option>
+                            <option value="BSCE">BSCE</option>
+                            <option value="BSEE">BSEE</option>
+                        </select>
+                        <div class="invalid-feedback">
+                            Please select your course.
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="year" class="form-label">Year</label>
+                        <select class="form-select" id="year" name="year" required>
+                            <option value="">Select Year</option>
+                            <option value="1">1st Year</option>
+                            <option value="2">2nd Year</option>
+                            <option value="3">3rd Year</option>
+                            <option value="4">4th Year</option>
+                        </select>
+                        <div class="invalid-feedback">
+                            Please select your year.
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="email" class="form-label">Email</label>
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fas fa-envelope"></i>
+                        </span>
+                        <input type="email" class="form-control" id="email" name="email" required
+                               pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
+                               data-email-exists-url="{{ url_for('auth.check_email') }}"
+                               placeholder="Enter your email">
+                    </div>
+                    <div class="invalid-feedback">
+                        Please enter a valid email address.
+                    </div>
+                    <div class="email-exists-feedback text-danger" style="display: none;">
+                        This email is already registered.
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="password" class="form-label">Password</label>
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fas fa-lock"></i>
+                        </span>
+                        <input type="password" class="form-control" id="password" name="password" required
+                               minlength="8" placeholder="Enter your password">
+                        <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="invalid-feedback">
+                        Password must be at least 8 characters long.
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="confirm_password" class="form-label">Confirm Password</label>
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fas fa-lock"></i>
+                        </span>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required
+                               minlength="8" placeholder="Confirm your password">
+                        <button class="btn btn-outline-secondary" type="button" id="toggleConfirmPassword">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="invalid-feedback">
+                        Passwords do not match.
+                    </div>
+                </div>
+                <input type="hidden" name="user_type" value="STUDENT">
+                <div class="form-group">
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-user-plus me-2"></i>Register
+                        </button>
+                    </div>
+                </div>
+                <div class="form-footer text-center">
+                    <p>Already have an account? <a href="{{ url_for('auth.login') }}" class="link-primary">Login here</a></p>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Registration Successful!</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Your account has been created successfully. Would you like to login now?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a href="{{ url_for('auth.login') }}" class="btn btn-primary">Login Now</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Night Sky Animation Styles - Scoped to auth-left */
+.auth-left .night-sky {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    z-index: 1;
+}
+
+.auth-left .mountains {
+    position: absolute;
+    height: 80px;
+    width: 100%;
+    bottom: 0px;
+    left: 0px;
+    z-index: 2;
+}
+
+.auth-left .light-base {
+    position: absolute;
+    bottom: -80px;
+    left: 10vw;
+    width: 80vw;
+    height: 100px;
+    border-radius: 50%;
+    box-shadow: -0px -10px 30px 10px #ffc1a0, -0px -20px 40px 20px #fe9c7f,
+        -0px -30px 60px 30px #be6590, -0px -50px 150px 75px #632b6c;
+    background-color: #ffc1a0;
+    z-index: 1;
+}
+
+.auth-left .mountains-base {
+    content: "";
+    background: linear-gradient(
+        to bottom,
+        rgba(55, 5, 105, 0) 0%,
+        rgba(9, 0, 22, 1) 100%
+    );
+    width: 100%;
+    height: 100px;
+    position: absolute;
+    bottom: -10px;
+    z-index: 3;
+}
+
+.auth-left .mountains-base:after {
+    content: "";
+    background: linear-gradient(
+        to bottom,
+        rgba(55, 5, 105, 0) 0%,
+        rgba(9, 0, 22, 1) 100%
+    );
+    width: 100%;
+    height: 20px;
+    position: absolute;
+    bottom: 0px;
+    z-index: 3;
+}
+
+.auth-left .mountains-base:before {
+    content: "";
+    background: linear-gradient(
+        to bottom,
+        rgba(55, 5, 105, 0) 0%,
+        rgba(9, 0, 22, 1) 100%
+    );
+    width: 100%;
+    height: 15px;
+    position: absolute;
+    bottom: 10px;
+    z-index: 2;
+}
+
+.auth-left .mountains > [class^="mountain"],
+.auth-left .mountains > [class^="mountain"]:after,
+.auth-left .mountains > [class^="mountain"]:before,
+.auth-left .mountains > [class^="land"],
+.auth-left .mountains > [class^="land"]:after,
+.auth-left .mountains > [class^="land"]:before {
+    background: #110124;
+    box-shadow: 0px 0px 50px 5px rgba(255, 255, 255, 0.2);
+    position: absolute;
+    bottom: 0px;
+}
+
+.auth-left .mountain-2 {
+    width: 60px;
+    height: 60px;
+    bottom: -20px !important;
+    left: -10px;
+    transform: rotate(45deg);
+    border-top-left-radius: 10px;
+}
+
+.auth-left .mountain-1 {
+    width: 100px;
+    height: 100px;
+    bottom: -40px !important;
+    left: 10px;
+    transform: rotate(45deg);
+    border-top-left-radius: 10px;
+}
+
+.auth-left .land-1 {
+    width: 30%;
+    height: 20px;
+    border-top-right-radius: 100%;
+}
+
+.auth-left .land-2 {
+    width: 60%;
+    height: 15px;
+    left: 30%;
+    border-top-left-radius: 200%;
+    border-top-right-radius: 200%;
+}
+
+.auth-left .land-3 {
+    width: 20%;
+    height: 20px;
+    left: 80%;
+    border-top-left-radius: 100%;
+}
+
+.auth-left .stars {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    width: 100%;
+    height: 100%;
+    transition: all 10s linear;
+}
+
+.auth-left .star {
+    position: absolute;
+    border-radius: 50%;
+    background-color: white;
+    opacity: 0.8;
+}
+
+.auth-left .blink {
+    animation: blink ease-in-out infinite;
+}
+
+@keyframes blink {
+    50% {
+        opacity: 0;
+    }
+}
+
+.auth-left .star-0 {
+    height: 0.5px;
+    width: 0.5px;
+}
+
+.auth-left .star-1 {
+    height: 1px;
+    width: 1px;
+}
+
+.auth-left .star-2 {
+    height: 1.5px;
+    width: 1.5px;
+}
+
+.auth-left .star-3 {
+    height: 2px;
+    width: 2px;
+}
+
+.auth-left .star-4 {
+    height: 2.5px;
+    width: 2.5px;
+    box-shadow: 0px 0px 6px 1px rgba(255,255,255,0.5);
+}
+
+.auth-left .star-5 {
+    height: 2.5px;
+    width: 2.5px;
+    box-shadow: 0px 0px 6px 1px rgba(255,255,255,0.7);
+}
+
+.auth-left .stars-cross {
+    position: absolute;
+    top: 10vh;
+    left: 0px;
+    width: 120%;
+    height: 20vh;
+    transform: rotate(20deg);
+    transform-origin: top left;
+}
+
+.auth-left .stars-cross-aux {
+    position: absolute;
+    top: 0vh;
+    left: 10%;
+    width: 120%;
+    height: 10vh;
+    transform: rotate(20deg);
+    transform-origin: top left;
+}
+
+.auth-left .stars-cross > .blur,
+.auth-left .stars-cross-aux > .blur {
+    position: absolute;
+    border-radius: 50%;
+    background-color: white;
+    opacity: 1;
+    filter: blur(15px);
+    width: 5px;
+    height: 10px;
+}
+
+/* Existing styles */
+.auth-container {
+    display: flex;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+
+.auth-left {
+    flex: 0 0 70%;
+    background: linear-gradient(135deg, #4e73df 0%, #224abe 50%, #1a3a8f 100%);
+    color: white;
+    padding: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.auth-left::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+        url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ffffff' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
+    opacity: 0.1;
+}
+
+.auth-left::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%);
+    z-index: 1;
+}
+
+.brand-logo {
+    font-size: 3.5rem;
+    margin-bottom: 2rem;
+    color: white;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0px); }
+}
+
+.auth-content {
+    max-width: 600px;
+    position: relative;
+    z-index: 2;
+}
+
+.features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    margin-top: 3rem;
+}
+
+.feature-item {
+    text-align: center;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(5px);
+}
+
+.feature-item:hover {
+    transform: translateY(-5px);
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.feature-item i {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    color: #fff;
+}
+
+.auth-right {
+    flex: 0 0 30%;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    padding: 3rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: -5px 0 25px rgba(0,0,0,0.05);
+    position: relative;
+    overflow: hidden;
+}
+
+.auth-right::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        radial-gradient(circle at 0% 0%, rgba(78, 115, 223, 0.05) 0%, transparent 50%),
+        radial-gradient(circle at 100% 100%, rgba(78, 115, 223, 0.05) 0%, transparent 50%);
+    z-index: 1;
+}
+
+.auth-form-container {
+    width: 100%;
+    max-width: 400px;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 2.5rem;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    position: relative;
+    z-index: 2;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.auth-form-container:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+}
+
+.form-header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.form-header h2 {
+    font-weight: 800;
+    color: #2d3748;
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.form-header p {
+    color: #718096;
+    font-size: 1rem;
+}
+
+.form-group {
+    margin-bottom: 1.75rem;
+}
+
+.form-label {
+    font-weight: 600;
+    color: #4a5568;
+    margin-bottom: 0.75rem;
+    font-size: 0.95rem;
+}
+
+.input-group {
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    transition: all 0.3s ease;
+}
+
+.input-group:focus-within {
+    box-shadow: 0 0 0 3px rgba(78, 115, 223, 0.1);
+}
+
+.input-group-text {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #a0aec0;
+    padding: 0.75rem 1rem;
+}
+
+.form-control, .form-select {
+    border: 1px solid #e2e8f0;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    background: #f8fafc;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #4e73df;
+    background: #ffffff;
+    box-shadow: none;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+    border: none;
+    padding: 0.875rem;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(78, 115, 223, 0.2);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(78, 115, 223, 0.3);
+}
+
+.form-footer {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e2e8f0;
+    text-align: center;
+}
+
+.form-footer p {
+    color: #718096;
+    font-size: 0.95rem;
+}
+
+.link-primary {
+    color: #4e73df;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.link-primary::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform 0.3s ease;
+}
+
+.link-primary:hover {
+    color: #224abe;
+}
+
+.link-primary:hover::after {
+    transform: scaleX(1);
+    transform-origin: left;
+}
+
+.alert {
+    border-radius: 12px;
+    border: none;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.alert-success {
+    background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+    color: white;
+}
+
+.alert-danger {
+    background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .auth-container {
+        flex-direction: column;
+    }
+    
+    .auth-left, .auth-right {
+        flex: 0 0 100%;
+    }
+    
+    .auth-form-container {
+        padding: 2rem;
+    }
+}
+
+/* Make name fields wider and more readable */
+#lastname, #firstname, #middlename {
+    min-width: 220px;
+    font-size: 1.1rem;
+    padding-left: 0.75rem;
+}
+@media (max-width: 768px) {
+    #lastname, #firstname, #middlename {
+        min-width: 100px;
+        font-size: 1rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Form validation
+(function () {
+    'use strict'
+    var forms = document.querySelectorAll('.needs-validation')
+    Array.prototype.slice.call(forms).forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            if (!form.checkValidity()) {
+                event.preventDefault()
+                event.stopPropagation()
+            }
+            form.classList.add('was-validated')
+        }, false)
+    })
+})()
+
+// Password toggle
+document.getElementById('togglePassword').addEventListener('click', function() {
+    const password = document.getElementById('password');
+    const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+    password.setAttribute('type', type);
+    this.querySelector('i').classList.toggle('fa-eye');
+    this.querySelector('i').classList.toggle('fa-eye-slash');
+});
+
+// Email existence check
+const emailInput = document.getElementById('email');
+const emailExistsFeedback = document.querySelector('.email-exists-feedback');
+
+emailInput.addEventListener('blur', function() {
+    const email = this.value;
+    if (email) {
+        fetch(this.dataset.emailExistsUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email: email })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.exists) {
+                emailExistsFeedback.style.display = 'block';
+                emailInput.setCustomValidity('This email is already registered');
+            } else {
+                emailExistsFeedback.style.display = 'none';
+                emailInput.setCustomValidity('');
+            }
+        });
+    }
+});
+
+// ID Number existence check
+const idnoInput = document.getElementById('idno');
+const idnoExistsFeedback = document.querySelector('.idno-exists-feedback');
+
+idnoInput.addEventListener('blur', function() {
+    const idno = this.value;
+    if (idno) {
+        fetch(this.dataset.idnoExistsUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ idno: idno })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.exists) {
+                idnoExistsFeedback.style.display = 'block';
+                idnoInput.setCustomValidity('This ID number is already registered');
+            } else {
+                idnoExistsFeedback.style.display = 'none';
+                idnoInput.setCustomValidity('');
+            }
+        });
+    }
+});
+
+// Show success modal after successful registration
+document.querySelector('form').addEventListener('submit', function(e) {
+    if (this.checkValidity()) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        fetch(this.action, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.text())
+        .then(html => {
+            if (html.includes('Registration successful')) {
+                const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+                successModal.show();
+            } else {
+                window.location.reload();
+            }
+        });
+    }
+});
+
+// Night Sky Animation
+$(function() {
+    var nightsky = ["#280F36", "#632B6C", "#BE6590", "#FFC1A0", "#FE9C7F"];
+
+    function getRandomInt(min, max) {
+        return Math.random() * (max - min) + min;
+    }
+
+    function createStar(container, type, count, minTop, maxTop, minLeft, maxLeft, minDuration, maxDuration) {
+        for (let i = 0; i < count; i++) {
+            const star = $(`<div class='star star-${type}'></div>`);
+            star.css({
+                top: getRandomInt(minTop, maxTop) + 'vh',
+                left: getRandomInt(minLeft, maxLeft) + 'vw',
+                animationDuration: getRandomInt(minDuration, maxDuration) + 's'
+            });
+            container.append(star);
+        }
+    }
+
+    // Create stars
+    createStar($('.auth-left .stars'), '0', 500, 0, 40, 0, 100, 2, 5);
+    createStar($('.auth-left .stars'), '1', 500, 20, 70, 0, 100, 4, 8);
+    createStar($('.auth-left .stars'), '2', 150, 0, 50, 0, 100, 1, 2.5);
+    createStar($('.auth-left .stars'), '3', 150, 0, 50, 0, 100, 2.5, 4);
+    createStar($('.auth-left .stars'), '4', 150, 0, 50, 0, 100, 4, 5);
+    createStar($('.auth-left .stars'), '5', 50, 0, 50, 0, 100, 5, 7);
+
+    // Create cross stars
+    for (let i = 0; i < 150; i++) {
+        const color = nightsky[Math.floor(Math.random() * nightsky.length)];
+        const blur = $('<div class="blur"></div>').css({
+            top: getRandomInt(0, 100) + '%',
+            left: getRandomInt(0, 100) + '%',
+            backgroundColor: color
+        });
+        $('.auth-left .stars-cross').append(blur);
+    }
+
+    // Create auxiliary cross stars
+    for (let i = 0; i < 50; i++) {
+        const color = nightsky[Math.floor(Math.random() * nightsky.length)];
+        const blur = $('<div class="blur"></div>').css({
+            top: getRandomInt(0, 100) + '%',
+            left: getRandomInt(0, 100) + '%',
+            backgroundColor: color
+        });
+        $('.auth-left .stars-cross-aux').append(blur);
+    }
+});
+</script>
+{% endblock %} 

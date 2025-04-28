@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+
+{% block title %}Learning Resources{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header Section -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">Learning Resources</h1>
+            <p class="text-muted">Access educational resources for your course</p>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Resources</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ resources|length }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-book fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">File Resources</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ resources|selectattr('RESOURCE_TYPE', 'equalto', 'file')|list|length }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-file fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Link Resources</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ resources|selectattr('RESOURCE_TYPE', 'equalto', 'link')|list|length }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-link fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Text Resources</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ resources|selectattr('RESOURCE_TYPE', 'equalto', 'text')|list|length }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-file-alt fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resources Grid -->
+    <div class="row" id="resourcesGrid">
+        {% for resource in resources %}
+        <div class="col-xl-4 col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-primary">{{ resource.TITLE }}</h6>
+                    <div class="dropdown">
+                        <button class="btn btn-link text-dark p-0" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#" onclick="viewResource('{{ resource.RESOURCE_ID }}')">
+                                <i class="fas fa-eye me-2"></i>View
+                            </a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <span class="badge bg-{{ 'primary' if resource.RESOURCE_TYPE == 'file' else 'success' if resource.RESOURCE_TYPE == 'link' else 'info' if resource.RESOURCE_TYPE == 'text' else 'warning' }} me-2">
+                            {{ resource.RESOURCE_TYPE }}
+                        </span>
+                    </div>
+                    <p class="card-text text-muted">{{ resource.CONTEXT[:100] }}{% if resource.CONTEXT|length > 100 %}...{% endif %}</p>
+                </div>
+                <div class="card-footer bg-transparent">
+                    <small class="text-muted">
+                        <i class="fas fa-user me-1"></i>{{ resource.CREATED_BY_NAME }} • 
+                        <i class="fas fa-clock me-1"></i>{{ resource.CREATED_AT }}
+                    </small>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Resource View Modal -->
+<div class="modal fade" id="resourceModal" tabindex="-1" aria-labelledby="resourceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="resourceModalLabel">Resource Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="resourceContent"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+/* Card Styles */
+.card {
+    border: none;
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.card-header {
+    background-color: #f8f9fc;
+    border-bottom: 1px solid #e3e6f0;
+}
+
+/* Badge Styles */
+.badge {
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+}
+
+/* Dropdown Styles */
+.dropdown-menu {
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    border: none;
+}
+
+.dropdown-item:hover {
+    background-color: #f8f9fc;
+}
+
+/* Resource View Styles */
+.resource-preview {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.resource-text {
+    white-space: pre-wrap;
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.resource-link {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: #e9ecef;
+    border-radius: 4px;
+    color: #0d6efd;
+    text-decoration: none;
+    margin-bottom: 1rem;
+}
+
+.resource-link:hover {
+    background: #dee2e6;
+    color: #0a58ca;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function viewResource(resourceId) {
+    fetch(`/student/resources/${resourceId}`)
+        .then(response => response.json())
+        .then(data => {
+            const modal = new bootstrap.Modal(document.getElementById('resourceModal'));
+            const modalTitle = document.getElementById('resourceModalLabel');
+            const modalContent = document.getElementById('resourceContent');
+            
+            modalTitle.textContent = data.title;
+            modalContent.innerHTML = `
+                <div class="mb-4">
+                    <p class="text-muted">${data.context}</p>
+                </div>
+                <div class="resource-content mb-4"></div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <strong>Created By:</strong>
+                            <span class="ms-2">${data.created_by}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <strong>Created At:</strong>
+                            <span class="ms-2">${data.created_at}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            const contentDiv = modalContent.querySelector('.resource-content');
+            switch(data.resource_type) {
+                case 'file':
+                    contentDiv.innerHTML = `
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-file fa-2x me-3 text-primary"></i>
+                            <a href="${data.resource_value}" class="btn btn-primary" target="_blank">
+                                <i class="fas fa-download me-2"></i>Download File
+                            </a>
+                        </div>
+                    `;
+                    break;
+                case 'link':
+                    contentDiv.innerHTML = `
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-link fa-2x me-3 text-primary"></i>
+                            <a href="${data.resource_value}" class="btn btn-primary" target="_blank">
+                                <i class="fas fa-external-link-alt me-2"></i>Open Link
+                            </a>
+                        </div>
+                    `;
+                    break;
+                case 'text':
+                    contentDiv.innerHTML = `
+                        <div class="p-3 bg-light rounded">
+                            <i class="fas fa-file-alt fa-2x me-3 text-primary"></i>
+                            ${data.resource_value}
+                        </div>
+                    `;
+                    break;
+                case 'image':
+                    contentDiv.innerHTML = `
+                        <div class="text-center">
+                            <img src="${data.resource_value}" class="img-fluid rounded" alt="${data.title}">
+                        </div>
+                    `;
+                    break;
+            }
+            
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while fetching the resource');
+        });
+}
+</script>
+{% endblock %} 

@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block title %}Sit-In History - Sit-In Management System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="page-title">Sit-In History</h2>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Your Sit-In Records</h5>
+                </div>
+                <div class="card-body">
+                    {% if sit_ins %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Lab</th>
+                                    <th>Purpose</th>
+                                    <th>Status</th>
+                                    <th>Time In</th>
+                                    <th>Time Out</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sit_in in sit_ins %}
+                                <tr>
+                                    <td>{{ sit_in.CREATED_AT }}</td>
+                                    <td>{{ sit_in.LAB_NAME }}</td>
+                                    <td>{{ sit_in.PURPOSE_NAME }}</td>
+                                    <td>
+                                        <span class="badge {% if sit_in.STATUS == 'COMPLETED' %}bg-success{% elif sit_in.STATUS == 'PENDING' %}bg-warning{% elif sit_in.STATUS == 'DENIED' %}bg-danger{% else %}bg-info{% endif %}">
+                                            {{ sit_in.STATUS }}
+                                        </span>
+                                    </td>
+                                    <td>{{ sit_in.TIME_IN }}</td>
+                                    <td>{{ sit_in.TIME_OUT or '-' }}</td>
+                                    <td>
+                                        {% if sit_in.STATUS == 'COMPLETED' and not sit_in.has_feedback %}
+                                        <button class="btn btn-sm btn-primary" onclick="showFeedbackModal('{{ sit_in.RECORD_ID }}')">
+                                            <i class="fas fa-comment"></i> Add Feedback
+                                        </button>
+                                        {% elif sit_in.has_feedback %}
+                                        <button class="btn btn-sm btn-info" onclick="viewFeedback('{{ sit_in.RECORD_ID }}')">
+                                            <i class="fas fa-eye"></i> View Feedback
+                                        </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    {% if total_pages > 1 %}
+                    <nav aria-label="Page navigation" class="mt-4">
+                        <ul class="pagination justify-content-center">
+                            <li class="page-item {% if page == 1 %}disabled{% endif %}">
+                                <a class="page-link" href="{{ url_for('student.sit_in_history', page=page-1) }}">Previous</a>
+                            </li>
+                            {% for p in range(1, total_pages + 1) %}
+                            <li class="page-item {% if p == page %}active{% endif %}">
+                                <a class="page-link" href="{{ url_for('student.sit_in_history', page=p) }}">{{ p }}</a>
+                            </li>
+                            {% endfor %}
+                            <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+                                <a class="page-link" href="{{ url_for('student.sit_in_history', page=page+1) }}">Next</a>
+                            </li>
+                        </ul>
+                    </nav>
+                    {% endif %}
+                    {% else %}
+                    <p class="text-muted">No sit-in records found.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Feedback Modal -->
+<div class="modal fade" id="feedbackModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Submit Feedback</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="feedbackForm">
+                    <input type="hidden" id="recordId">
+                    <div class="mb-3">
+                        <label class="form-label">Rating</label>
+                        <div class="rating-input">
+                            {% for i in range(5) %}
+                            <i class="fas fa-star" data-rating="{{ i + 1 }}"></i>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="comment" class="form-label">Comment</label>
+                        <textarea class="form-control" id="comment" rows="3" required></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitFeedback()">Submit Feedback</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- View Feedback Modal -->
+<div class="modal fade" id="viewFeedbackModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Your Feedback</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Rating</label>
+                    <div class="rating">
+                        {% for i in range(5) %}
+                        <i class="fas fa-star text-warning"></i>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Comment</label>
+                    <p id="feedbackComment" class="form-control-plaintext"></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.rating {
+    display: inline-block;
+}
+
+.rating-input {
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.rating-input .fa-star {
+    color: #ccc;
+    transition: color 0.2s;
+}
+
+.rating-input .fa-star:hover,
+.rating-input .fa-star.active {
+    color: #ffc107;
+}
+
+.badge {
+    font-size: 0.875rem;
+    padding: 0.5em 0.75em;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentRating = 0;
+
+function showFeedbackModal(recordId) {
+    document.getElementById('recordId').value = recordId;
+    currentRating = 0;
+    
+    // Reset star display
+    document.querySelectorAll('.rating-input .fa-star').forEach(star => {
+        star.classList.remove('active');
+    });
+    
+    // Reset comment
+    document.getElementById('comment').value = '';
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('feedbackModal'));
+    modal.show();
+}
+
+function viewFeedback(recordId) {
+    // Fetch feedback data
+    fetch(`/student/feedback/${recordId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data) {
+                // Update star display
+                const stars = document.querySelectorAll('#viewFeedbackModal .rating .fa-star');
+                stars.forEach((star, index) => {
+                    star.classList.toggle('text-warning', index < data.RATING);
+                });
+                
+                // Update comment
+                document.getElementById('feedbackComment').textContent = data.COMMENT;
+                
+                // Show modal
+                const modal = new bootstrap.Modal(document.getElementById('viewFeedbackModal'));
+                modal.show();
+            }
+        });
+}
+
+function submitFeedback() {
+    const recordId = document.getElementById('recordId').value;
+    const comment = document.getElementById('comment').value;
+    
+    if (!currentRating) {
+        alert('Please select a rating');
+        return;
+    }
+    
+    if (!comment.trim()) {
+        alert('Please enter a comment');
+        return;
+    }
+    
+    fetch('/student/feedback', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            record_id: recordId,
+            rating: currentRating,
+            comment: comment
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error submitting feedback');
+        }
+    });
+}
+
+// Star rating interaction
+document.querySelectorAll('.rating-input .fa-star').forEach(star => {
+    star.addEventListener('click', function() {
+        const rating = parseInt(this.dataset.rating);
+        currentRating = rating;
+        
+        // Update star display
+        document.querySelectorAll('.rating-input .fa-star').forEach((s, index) => {
+            s.classList.toggle('active', index < rating);
+        });
+    });
+});
+</script>
+{% endblock %} 

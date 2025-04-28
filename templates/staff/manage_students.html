@@ -1,0 +1,101 @@
+<div class="card shadow mb-4">
+    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <h6 class="m-0 font-weight-bold text-primary">Manage Students</h6>
+        <button type="button" class="btn btn-warning" id="resetAllSitIns">
+            <i class="fas fa-sync"></i> Reset All Sit-In Counts
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="studentsTable" width="100%" cellspacing="0">
+                <thead>
+                    <tr>
+                        <th>ID Number</th>
+                        <th>Name</th>
+                        <th>Course</th>
+                        <th>Year</th>
+                        <th>Sit-In Count</th>
+                        <th>Max Sit-Ins</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in students %}
+                    <tr>
+                        <td>{{ student.IDNO }}</td>
+                        <td>{{ student.FIRSTNAME }} {{ student.LASTNAME }}</td>
+                        <td>{{ student.COURSE }}</td>
+                        <td>{{ student.YEAR }}</td>
+                        <td>{{ student.SIT_IN_COUNT }}</td>
+                        <td>{{ student.MAX_SIT_INS }}</td>
+                        <td>
+                            <span class="badge bg-{{ 'success' if student.STATUS == 'active' else 'danger' }}">
+                                {{ student.STATUS }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-info view-student" data-idno="{{ student.IDNO }}">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-warning reset-sit-ins" data-idno="{{ student.IDNO }}">
+                                    <i class="fas fa-sync"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Reset all sit-in counts
+    $('#resetAllSitIns').click(function() {
+        if (confirm('Are you sure you want to reset all students\' sit-in counts?')) {
+            $.ajax({
+                url: '/staff/reset-all-sit-ins',
+                type: 'POST',
+                success: function(response) {
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        alert(response.message);
+                    }
+                },
+                error: function(xhr) {
+                    alert(xhr.responseJSON.message || 'Error resetting sit-in counts');
+                }
+            });
+        }
+    });
+
+    // Reset individual student's sit-in count
+    $(document).on('click', '.reset-sit-ins', function() {
+        const idno = $(this).data('idno');
+        if (confirm('Are you sure you want to reset this student\'s sit-in count?')) {
+            $.ajax({
+                url: `/staff/reset-student-sit-ins/${idno}`,
+                type: 'POST',
+                success: function(response) {
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        alert(response.message);
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Error:', xhr);
+                    alert(xhr.responseJSON.message || 'Error resetting sit-in count');
+                }
+            });
+        }
+    });
+});
+</script>
+{% endblock %} 

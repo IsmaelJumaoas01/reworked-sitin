@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block title %}Rewards & Points - Sit-In Management System{% endblock %}
+
+{% block content %}
+<div class="rewards-container">
+    <!-- Points Overview Card -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="stats-card primary">
+                <div class="stats-icon">
+                    <i class="fas fa-star"></i>
+                </div>
+                <div class="stats-info">
+                    <h5 class="text-white">Current Points</h5>
+                    <h2 class="text-white">{{ points.CURRENT_POINTS }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card success">
+                <div class="stats-icon">
+                    <i class="fas fa-trophy"></i>
+                </div>
+                <div class="stats-info">
+                    <h5 class="text-white">Total Points Earned</h5>
+                    <h2 class="text-white">{{ points.TOTAL_POINTS }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card info">
+                <div class="stats-icon">
+                    <i class="fas fa-gift"></i>
+                </div>
+                <div class="stats-info">
+                    <h5 class="text-white">Points Redeemed</h5>
+                    <h2 class="text-white">{{ points.TOTAL_POINTS - points.CURRENT_POINTS }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Points History -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="content-card">
+                <div class="card-header">
+                    <h5 class="mb-0 text-white">Points History</h5>
+                </div>
+                <div class="card-body">
+                    {% if points_history %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Points Change</th>
+                                    <th>Reason</th>
+                                    <th>Added By</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for history in points_history %}
+                                <tr>
+                                    <td>{{ history.CREATED_AT.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>
+                                        <span class="points-change {{ 'positive' if history.POINTS_CHANGE > 0 else 'negative' }}">
+                                            {{ '+' if history.POINTS_CHANGE > 0 }}{{ history.POINTS_CHANGE }}
+                                        </span>
+                                    </td>
+                                    <td>{{ history.REASON }}</td>
+                                    <td>{{ history.added_by_name }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-history"></i>
+                        <p>No points history available.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Redemption History -->
+    <div class="row">
+        <div class="col-12">
+            <div class="content-card">
+                <div class="card-header">
+                    <h5 class="mb-0 text-white">Redemption History</h5>
+                </div>
+                <div class="card-body">
+                    {% if redemption_history %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Points Used</th>
+                                    <th>Sit-In Session</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for redemption in redemption_history %}
+                                <tr>
+                                    <td>{{ redemption.CREATED_AT.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>{{ redemption.POINTS_USED }}</td>
+                                    <td>{{ redemption.sit_in_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>
+                                        <span class="status-badge {{ 'success' if redemption.STATUS == 'COMPLETED' else 'warning' }}">
+                                            {{ redemption.STATUS }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-gift"></i>
+                        <p>No redemption history available.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.rewards-container {
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: calc(100vh - 60px);
+}
+
+.stats-card {
+    background: white;
+    border-radius: 15px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    height: 100%;
+    transition: all 0.3s ease;
+}
+
+.stats-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+}
+
+.stats-card.primary {
+    background: linear-gradient(135deg, var(--primary-color) 0%, #224abe 100%);
+}
+
+.stats-card.success {
+    background: linear-gradient(135deg, var(--success-color) 0%, #13855c 100%);
+}
+
+.stats-card.info {
+    background: linear-gradient(135deg, var(--info-color) 0%, #258391 100%);
+}
+
+.stats-icon {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.stats-info h5 {
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.stats-info h2 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.content-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.content-card .card-header {
+    background: linear-gradient(135deg, var(--primary-color) 0%, #224abe 100%);
+    padding: 1rem 1.5rem;
+    border-bottom: none;
+}
+
+.content-card .card-body {
+    padding: 1.5rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: #6c757d;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.points-change {
+    font-weight: 600;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+}
+
+.points-change.positive {
+    background: #28a745;
+    color: white;
+}
+
+.points-change.negative {
+    background: #dc3545;
+    color: white;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.status-badge.success {
+    background: #28a745;
+    color: white;
+}
+
+.status-badge.warning {
+    background: #ffc107;
+    color: #212529;
+}
+</style>
+{% endblock %} 

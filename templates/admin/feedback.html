@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+
+{% block title %}Feedback Management - Sit-In Management System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="page-title">Feedback Management</h2>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <input type="text" class="form-control" id="studentFilter" placeholder="Search by student name">
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select" id="labFilter">
+                                <option value="">All Labs</option>
+                                {% for lab in labs %}
+                                <option value="{{ lab.LAB_ID }}">{{ lab.LAB_NAME }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select" id="ratingFilter">
+                                <option value="">All Ratings</option>
+                                <option value="1">1 Star</option>
+                                <option value="2">2 Stars</option>
+                                <option value="3">3 Stars</option>
+                                <option value="4">4 Stars</option>
+                                <option value="5">5 Stars</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <input type="date" class="form-control" id="dateFilter">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-12 d-flex justify-content-between align-items-center">
+                            <div>
+                                <a href="{{ url_for('admin.view_feedback') }}" class="btn btn-secondary">
+                                    <i class="fas fa-times me-2"></i>Clear Filters
+                                </a>
+                            </div>
+                            <div class="download-menu">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleDownloadMenu('feedbackMenu')">
+                                    <i class="fas fa-download"></i> Download
+                                </button>
+                                <div id="feedbackMenu" class="download-options">
+                                    <a href="{{ url_for('admin.download_report', report_type='feedback', format='csv', **request.args) }}" class="download-option">
+                                        <i class="fas fa-file-csv"></i> CSV
+                                    </a>
+                                    <a href="{{ url_for('admin.download_report', report_type='feedback', format='pdf', **request.args) }}" class="download-option">
+                                        <i class="fas fa-file-pdf"></i> PDF
+                                    </a>
+                                    <a href="{{ url_for('admin.download_report', report_type='feedback', format='excel', **request.args) }}" class="download-option">
+                                        <i class="fas fa-file-excel"></i> Excel
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feedback List -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">All Feedback</h5>
+                </div>
+                <div class="card-body">
+                    {% if feedbacks %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Student</th>
+                                    <th>Lab</th>
+                                    <th>Purpose</th>
+                                    <th>Rating</th>
+                                    <th>Comment</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for feedback in feedbacks %}
+                                <tr>
+                                    <td>{{ feedback.SIT_IN_DATE }}</td>
+                                    <td>{{ feedback.STUDENT_NAME }}</td>
+                                    <td>{{ feedback.LAB_NAME }}</td>
+                                    <td>{{ feedback.PURPOSE_NAME }}</td>
+                                    <td>
+                                        <div class="rating">
+                                            {% for i in range(5) %}
+                                            <i class="fas fa-star {% if i < feedback.RATING %}text-warning{% else %}text-muted{% endif %}"></i>
+                                            {% endfor %}
+                                        </div>
+                                    </td>
+                                    <td>{{ feedback.COMMENT }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    {% if total_pages > 1 %}
+                    <nav aria-label="Page navigation" class="mt-4">
+                        <ul class="pagination justify-content-center">
+                            <li class="page-item {% if page == 1 %}disabled{% endif %}">
+                                <a class="page-link" href="{{ url_for('admin.feedback', page=page-1, **request.args) }}">Previous</a>
+                            </li>
+                            {% for p in range(1, total_pages + 1) %}
+                            <li class="page-item {% if p == page %}active{% endif %}">
+                                <a class="page-link" href="{{ url_for('admin.feedback', page=p, **request.args) }}">{{ p }}</a>
+                            </li>
+                            {% endfor %}
+                            <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+                                <a class="page-link" href="{{ url_for('admin.feedback', page=page+1, **request.args) }}">Next</a>
+                            </li>
+                        </ul>
+                    </nav>
+                    {% endif %}
+                    {% else %}
+                    <p class="text-muted">No feedback found.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Table Styles */
+.table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #212529;
+    border-bottom: 2px solid #dee2e6;
+    padding: 12px;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+}
+
+.table td {
+    vertical-align: middle;
+    padding: 12px;
+    color: #212529;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.card-header h5 {
+    color: #212529;
+    font-weight: 600;
+    margin: 0;
+}
+
+.badge {
+    padding: 8px 12px;
+    font-weight: 500;
+    font-size: 0.9rem;
+    border-radius: 6px;
+}
+
+.badge.bg-success {
+    background-color: #28a745 !important;
+}
+
+.badge.bg-secondary {
+    background-color: #6c757d !important;
+}
+
+/* Download Menu Styles */
+.download-menu {
+    position: relative;
+    z-index: 9999;
+}
+
+.download-options {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    padding: 0.5rem 0;
+    min-width: 150px;
+    z-index: 10000;
+    margin-top: 0.5rem;
+}
+
+.download-options.show {
+    display: block;
+}
+
+.download-option {
+    display: block;
+    padding: 0.5rem 1rem;
+    color: #5a5c69;
+    text-decoration: none;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.download-option:hover {
+    background-color: #f8f9fc;
+    color: var(--primary-color);
+}
+
+.download-option i {
+    margin-right: 0.5rem;
+    width: 20px;
+    text-align: center;
+}
+
+/* Card Styles */
+.card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    margin-bottom: 1.5rem;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+/* Filter Form Styles */
+.form-label {
+    font-weight: 500;
+    color: #5a5c69;
+    margin-bottom: 0.5rem;
+}
+
+.form-select, .form-control {
+    border-radius: 8px;
+    border: 1px solid #d1d3e2;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+}
+
+.form-select:focus, .form-control:focus {
+    border-color: #4e73df;
+    box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+}
+
+/* Button Styles */
+.btn {
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background-color: #4e73df;
+    border-color: #4e73df;
+}
+
+.btn-primary:hover {
+    background-color: #2e59d9;
+    border-color: #2653d4;
+}
+
+.btn-secondary {
+    background-color: #858796;
+    border-color: #858796;
+}
+
+.btn-secondary:hover {
+    background-color: #717384;
+    border-color: #6b6d7d;
+}
+
+/* Pagination Styles */
+.pagination {
+    margin-top: 1.5rem;
+}
+
+.page-link {
+    color: #4e73df;
+    border: 1px solid #d1d3e2;
+    padding: 0.5rem 1rem;
+    margin: 0 2px;
+    border-radius: 4px;
+}
+
+.page-item.active .page-link {
+    background-color: #4e73df;
+    border-color: #4e73df;
+}
+
+.page-link:hover {
+    background-color: #eaecf4;
+    border-color: #d1d3e2;
+    color: #2e59d9;
+}
+
+/* Rating Styles */
+.rating {
+    display: inline-block;
+}
+
+.rating .fa-star {
+    font-size: 1.1rem;
+}
+
+.rating .text-warning {
+    color: #f6c23e !important;
+}
+
+.rating .text-muted {
+    color: #d1d3e2 !important;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Download menu functionality
+function toggleDownloadMenu(menuId) {
+    const menu = document.getElementById(menuId);
+    const allMenus = document.querySelectorAll('.download-options');
+    
+    // Close all other menus
+    allMenus.forEach(m => {
+        if (m.id !== menuId) {
+            m.classList.remove('show');
+        }
+    });
+    
+    // Toggle current menu
+    menu.classList.toggle('show');
+}
+
+// Close menus when clicking outside
+document.addEventListener('click', function(event) {
+    if (!event.target.closest('.download-menu')) {
+        document.querySelectorAll('.download-options').forEach(menu => {
+            menu.classList.remove('show');
+        });
+    }
+});
+</script>
+{% endblock %} 

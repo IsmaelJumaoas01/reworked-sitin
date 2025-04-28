@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Request Sit-In - Sit-In Management System{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2>Request Sit-In</h2>
+        <hr>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">New Sit-In Request</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('sit_in.request_sit_in') }}">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="lab_id" class="form-label">Laboratory</label>
+                            <select class="form-select" id="lab_id" name="lab_id" required>
+                                <option value="">Select Laboratory</option>
+                                {% for lab in labs %}
+                                <option value="{{ lab.lab_id }}">{{ lab.lab_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="computer_id" class="form-label">Computer Number</label>
+                            <select class="form-select" id="computer_id" name="computer_id" required>
+                                <option value="">Select Computer</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="purpose_id" class="form-label">Purpose</label>
+                            <select class="form-select" id="purpose_id" name="purpose_id" required>
+                                <option value="">Select Purpose</option>
+                                {% for purpose in purposes %}
+                                <option value="{{ purpose.purpose_id }}">{{ purpose.purpose_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="date" class="form-label">Date and Time</label>
+                            <input type="datetime-local" class="form-control" id="date" name="date" required>
+                        </div>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">Submit Request</button>
+                        <a href="{{ url_for('student.dashboard') }}" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('lab_id').addEventListener('change', function() {
+    const labId = this.value;
+    const computerSelect = document.getElementById('computer_id');
+    computerSelect.innerHTML = '<option value="">Select Computer</option>';
+    
+    if (labId) {
+        // Fetch available computers for the selected lab
+        fetch(`/api/computers/${labId}`)
+            .then(response => response.json())
+            .then(computers => {
+                computers.forEach(computer => {
+                    const option = document.createElement('option');
+                    option.value = computer.computer_id;
+                    option.textContent = `Computer ${computer.computer_id}`;
+                    computerSelect.appendChild(option);
+                });
+            });
+    }
+});
+</script>
+{% endblock %} 

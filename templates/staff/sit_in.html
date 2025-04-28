@@ -1,0 +1,421 @@
+{% extends "base.html" %}
+
+{% block title %}Sit-In Management - Sit-In Management System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="page-title">Sit-In Management</h2>
+        </div>
+    </div>
+
+    <!-- Today's Sit-Ins -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Today's Sit-Ins</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="todaySitInsTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>Student ID</th>
+                            <th>Name</th>
+                            <th>Lab</th>
+                            <th>Purpose</th>
+                            <th>Time In</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sit_in in today_sit_ins %}
+                        <tr>
+                            <td>{{ sit_in.USER_IDNO }}</td>
+                            <td>{{ sit_in.FIRSTNAME }} {{ sit_in.LASTNAME }}</td>
+                            <td>{{ sit_in.LAB_NAME }}</td>
+                            <td>{{ sit_in.PURPOSE_NAME }}</td>
+                            <td>{{ sit_in.TIME_IN }}</td>
+                            <td>
+                                <span class="badge bg-{{ 'success' if sit_in.SESSION == 'ON_GOING' else 'secondary' }}">
+                                    {{ sit_in.SESSION }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if sit_in.SESSION == 'ON_GOING' %}
+                                <button class="btn btn-danger btn-sm end-sit-in" data-record-id="{{ sit_in.RECORD_ID }}">
+                                    <i class="fas fa-stop"></i> End
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Search -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Search Student</h5>
+                </div>
+                <div class="card-body">
+                    <form id="searchForm" class="row g-3">
+                        <div class="col-md-8">
+                            <input type="text" class="form-control" id="studentId" placeholder="Enter Student ID Number" required>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-search me-2"></i>Search
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Information -->
+    <div id="studentInfo" class="row mb-4" style="display: none;">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Student Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Name:</strong> <span id="studentName"></span></p>
+                            <p><strong>Course:</strong> <span id="studentCourse"></span></p>
+                            <p><strong>Year:</strong> <span id="studentYear"></span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Remaining Sit-In Sessions:</strong> <span id="remainingSessions" class="badge bg-primary">-</span></p>
+                            <p><strong>Current Points:</strong> <span id="currentPoints" class="badge bg-primary">-</span></p>
+                            <p><strong>Status:</strong> <span id="studentStatus" class="badge">-</span></p>
+                            <button id="startSitInBtn" class="btn btn-success mt-3" data-bs-toggle="modal" data-bs-target="#startSitInModal">
+                                <i class="fas fa-play me-2"></i>Start Sit-In
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Sit-Ins -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Active Sit-Ins</h5>
+                        <a href="{{ url_for('staff.top_participants') }}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-trophy me-2"></i>Top Participants
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Lab</th>
+                                    <th>Purpose</th>
+                                    <th>Start Time</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="activeSitInsTable">
+                                <!-- Active sit-ins will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Start Sit-In Modal -->
+<div class="modal fade" id="startSitInModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Start Sit-In Session</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="startSitInForm">
+                    <input type="hidden" id="studentIdno">
+                    <div class="mb-3">
+                        <label for="labSelect" class="form-label">Select Lab</label>
+                        <select class="form-select" id="labSelect" required>
+                            <option value="">Choose a lab...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="purposeSelect" class="form-label">Select Purpose</label>
+                        <select class="form-select" id="purposeSelect" required>
+                            <option value="">Choose a purpose...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="pointsToUse" class="form-label">Points to Use</label>
+                        <input type="number" class="form-control" id="pointsToUse" min="1" value="1" required>
+                        <small class="text-muted">Available points: <span id="availablePoints">-</span></small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmStartSitIn">Start Session</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load labs and purposes
+    loadLabs();
+    loadPurposes();
+    loadActiveSitIns();
+
+    // Search form submission
+    document.getElementById('searchForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const studentId = document.getElementById('studentId').value;
+        searchStudent(studentId);
+    });
+
+    // Start sit-in button click
+    document.getElementById('confirmStartSitIn').addEventListener('click', function() {
+        startSitIn();
+    });
+
+    // End Sit-In
+    document.getElementById('todaySitInsTable').addEventListener('click', function(e) {
+        if (e.target.classList.contains('end-sit-in')) {
+            const recordId = e.target.getAttribute('data-record-id');
+            if (confirm('Are you sure you want to end this sit-in session?')) {
+                fetch(`/staff/end-sit-in/${recordId}`, {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        showToast('Error', data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    showToast('Error', 'Failed to end sit-in session', 'error');
+                });
+            }
+        }
+    });
+});
+
+function loadLabs() {
+    fetch('/staff/labs')
+        .then(response => response.json())
+        .then(data => {
+            const labSelect = document.getElementById('labSelect');
+            data.forEach(lab => {
+                if (lab.STATUS === 'active') {
+                    const option = document.createElement('option');
+                    option.value = lab.LAB_ID;
+                    option.textContent = lab.LAB_NAME;
+                    labSelect.appendChild(option);
+                }
+            });
+        });
+}
+
+function loadPurposes() {
+    fetch('/staff/purposes')
+        .then(response => response.json())
+        .then(data => {
+            const purposeSelect = document.getElementById('purposeSelect');
+            data.forEach(purpose => {
+                if (purpose.STATUS === 'active') {
+                    const option = document.createElement('option');
+                    option.value = purpose.PURPOSE_ID;
+                    option.textContent = purpose.PURPOSE_NAME;
+                    purposeSelect.appendChild(option);
+                }
+            });
+        });
+}
+
+function searchStudent(studentId) {
+    fetch(`/staff/student/${studentId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showToast('Error', data.error, 'error');
+                return;
+            }
+
+            document.getElementById('studentInfo').style.display = 'block';
+            document.getElementById('studentName').textContent = `${data.FIRSTNAME} ${data.LASTNAME}`;
+            document.getElementById('studentCourse').textContent = data.COURSE;
+            document.getElementById('studentYear').textContent = data.YEAR;
+            document.getElementById('remainingSessions').textContent = data.remaining_sessions;
+            document.getElementById('currentPoints').textContent = data.current_points;
+            document.getElementById('studentStatus').textContent = data.STATUS;
+            document.getElementById('studentStatus').className = `badge bg-${data.STATUS === 'active' ? 'success' : 'danger'}`;
+            document.getElementById('studentIdno').value = data.IDNO;
+            document.getElementById('availablePoints').textContent = data.current_points;
+
+            // Enable/disable start sit-in button
+            const startSitInBtn = document.getElementById('startSitInBtn');
+            if (data.current_points > 0 && data.STATUS === 'active') {
+                startSitInBtn.disabled = false;
+            } else {
+                startSitInBtn.disabled = true;
+                if (data.current_points <= 0) {
+                    showToast('Error', 'No points available for sit-in', 'error');
+                } else if (data.STATUS !== 'active') {
+                    showToast('Error', 'Student account is not active', 'error');
+                }
+            }
+        })
+        .catch(error => {
+            showToast('Error', 'Failed to fetch student information', 'error');
+        });
+}
+
+function startSitIn() {
+    const studentIdno = document.getElementById('studentIdno').value;
+    const labId = document.getElementById('labSelect').value;
+    const purposeId = document.getElementById('purposeSelect').value;
+    const pointsToUse = document.getElementById('pointsToUse').value;
+
+    if (!labId || !purposeId || !pointsToUse) {
+        showToast('Error', 'Please fill in all required fields', 'error');
+        return;
+    }
+
+    fetch('/staff/start-sit-in', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            student_idno: studentIdno,
+            lab_id: labId,
+            purpose_id: purposeId,
+            points_to_use: parseInt(pointsToUse)
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Success', 'Sit-in session started successfully', 'success');
+            document.getElementById('startSitInModal').querySelector('.btn-close').click();
+            loadActiveSitIns();
+            searchStudent(studentIdno); // Refresh student info
+        } else {
+            showToast('Error', data.message, 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error', 'Failed to start sit-in session', 'error');
+    });
+}
+
+function loadActiveSitIns() {
+    fetch('/staff/active-sit-ins')
+        .then(response => response.json())
+        .then(data => {
+            const tableBody = document.getElementById('activeSitInsTable');
+            tableBody.innerHTML = '';
+
+            data.forEach(sitIn => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${sitIn.FIRSTNAME} ${sitIn.LASTNAME}</td>
+                    <td>${sitIn.LAB_NAME}</td>
+                    <td>${sitIn.PURPOSE_NAME}</td>
+                    <td>${new Date(sitIn.CREATED_AT).toLocaleString()}</td>
+                    <td>
+                        <button class="btn btn-warning btn-sm" onclick="endSitIn(${sitIn.RECORD_ID})">
+                            <i class="fas fa-stop"></i> End Session
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        });
+}
+
+function endSitIn(recordId) {
+    if (confirm('Are you sure you want to end this sit-in session?')) {
+        fetch(`/staff/end-sit-in/${recordId}`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Success', 'Sit-in session ended successfully', 'success');
+                loadActiveSitIns();
+            } else {
+                showToast('Error', data.message, 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error', 'Failed to end sit-in session', 'error');
+        });
+    }
+}
+
+function showToast(title, message, type) {
+    const toast = document.createElement('div');
+    toast.className = `toast align-items-center text-white bg-${type} border-0`;
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+    
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                <strong>${title}</strong><br>
+                ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+    
+    document.body.appendChild(toast);
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+    
+    toast.addEventListener('hidden.bs.toast', function() {
+        document.body.removeChild(toast);
+    });
+}
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<style>
+.toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1050;
+}
+</style>
+{% endblock %} 
