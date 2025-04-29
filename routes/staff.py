@@ -963,17 +963,16 @@ def download_announcements():
 @login_required
 @role_required('STAFF')
 def view_resources():
-    # Get all enabled resources with their courses
+    # Get all enabled resources with their purposes
     query = """
     SELECT 
         r.*,
-        GROUP_CONCAT(lrc.COURSE) as COURSES,
+        p.PURPOSE_NAME,
         CONCAT(u.FIRSTNAME, ' ', u.LASTNAME) as CREATED_BY
     FROM LAB_RESOURCES r
-    LEFT JOIN LAB_RESOURCE_COURSES lrc ON r.RESOURCE_ID = lrc.RESOURCE_ID
+    JOIN PURPOSES p ON r.PURPOSE_ID = p.PURPOSE_ID
     LEFT JOIN USERS u ON r.CREATED_BY = u.IDNO
     WHERE r.ENABLED = TRUE
-    GROUP BY r.RESOURCE_ID
     ORDER BY r.CREATED_AT DESC
     """
     resources = execute_query(query)
@@ -988,13 +987,12 @@ def get_resource(resource_id):
     query = """
     SELECT 
         r.*,
-        GROUP_CONCAT(lrc.COURSE) as COURSES,
+        p.PURPOSE_NAME,
         CONCAT(u.FIRSTNAME, ' ', u.LASTNAME) as CREATED_BY
     FROM LAB_RESOURCES r
-    LEFT JOIN LAB_RESOURCE_COURSES lrc ON r.RESOURCE_ID = lrc.RESOURCE_ID
+    JOIN PURPOSES p ON r.PURPOSE_ID = p.PURPOSE_ID
     LEFT JOIN USERS u ON r.CREATED_BY = u.IDNO
     WHERE r.RESOURCE_ID = %s AND r.ENABLED = TRUE
-    GROUP BY r.RESOURCE_ID
     """
     resource = execute_query(query, (resource_id,))
     
@@ -1007,7 +1005,7 @@ def get_resource(resource_id):
         'context': resource['CONTEXT'],
         'resource_type': resource['RESOURCE_TYPE'],
         'resource_value': resource['RESOURCE_VALUE'],
-        'courses': resource['COURSES'].split(',') if resource['COURSES'] else [],
+        'purpose_name': resource['PURPOSE_NAME'],
         'created_by': resource['CREATED_BY'],
         'created_at': resource['CREATED_AT'].strftime('%Y-%m-%d %H:%M:%S')
     })
@@ -1016,14 +1014,15 @@ def get_resource(resource_id):
 @login_required
 @role_required('STAFF')
 def add_resource():
-    courses = execute_query("SELECT DISTINCT COURSE FROM USERS WHERE USER_TYPE='STUDENT'")
+    purposes = execute_query("SELECT * FROM PURPOSES WHERE STATUS = 'active' ORDER BY PURPOSE_NAME")
     if request.method == 'POST':
         title = request.form['title']
         context = request.form['context']
         resource_type = request.form['resource_type']
+        purpose_id = request.form['purpose_id']
         enabled = request.form.get('enabled', 'off') == 'on'
-        selected_courses = request.form.getlist('courses')
         resource_value = ''
+        
         if resource_type in ['file', 'image'] and 'resource_file' in request.files:
             file = request.files['resource_file']
             if file and file.filename:
@@ -1035,32 +1034,32 @@ def add_resource():
             resource_value = request.form['resource_link']
         elif resource_type == 'text':
             resource_value = request.form['resource_text']
+            
         resource_id = execute_query(
             """
-            INSERT INTO LAB_RESOURCES (TITLE, CONTEXT, RESOURCE_TYPE, RESOURCE_VALUE, ENABLED, CREATED_BY)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO LAB_RESOURCES (TITLE, CONTEXT, RESOURCE_TYPE, RESOURCE_VALUE, PURPOSE_ID, ENABLED, CREATED_BY)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             """,
-            (title, context, resource_type, resource_value, enabled, session['user_id'])
+            (title, context, resource_type, resource_value, purpose_id, enabled, session['user_id'])
         )
-        for course in selected_courses:
-            execute_query("INSERT INTO LAB_RESOURCE_COURSES (RESOURCE_ID, COURSE) VALUES (%s, %s)", (resource_id, course))
-        return redirect(url_for('staff.manage_resources'))
-    return render_template('staff/resource_form.html', courses=courses, resource=None)
+        return redirect(url_for('staff.view_resources'))
+    return render_template('staff/resource_form.html', purposes=purposes, resource=None)
 
 @staff_bp.route('/resources/edit/<int:resource_id>', methods=['GET', 'POST'])
 @login_required
 @role_required('STAFF')
 def edit_resource(resource_id):
     resource = execute_query("SELECT * FROM LAB_RESOURCES WHERE RESOURCE_ID=%s", (resource_id,))[0]
-    courses = execute_query("SELECT DISTINCT COURSE FROM USERS WHERE USER_TYPE='STUDENT'")
-    assigned_courses = [c['COURSE'] for c in execute_query("SELECT COURSE FROM LAB_RESOURCE_COURSES WHERE RESOURCE_ID=%s", (resource_id,))]
+    purposes = execute_query("SELECT * FROM PURPOSES WHERE STATUS = 'active' ORDER BY PURPOSE_NAME")
+    
     if request.method == 'POST':
         title = request.form['title']
         context = request.form['context']
         resource_type = request.form['resource_type']
+        purpose_id = request.form['purpose_id']
         enabled = request.form.get('enabled', 'off') == 'on'
-        selected_courses = request.form.getlist('courses')
         resource_value = resource['RESOURCE_VALUE']
+        
         if resource_type in ['file', 'image'] and 'resource_file' in request.files:
             file = request.files['resource_file']
             if file and file.filename:
@@ -1072,25 +1071,24 @@ def edit_resource(resource_id):
             resource_value = request.form['resource_link']
         elif resource_type == 'text':
             resource_value = request.form['resource_text']
+            
         execute_query(
             """
-            UPDATE LAB_RESOURCES SET TITLE=%s, CONTEXT=%s, RESOURCE_TYPE=%s, RESOURCE_VALUE=%s, ENABLED=%s WHERE RESOURCE_ID=%s
+            UPDATE LAB_RESOURCES 
+            SET TITLE=%s, CONTEXT=%s, RESOURCE_TYPE=%s, RESOURCE_VALUE=%s, PURPOSE_ID=%s, ENABLED=%s 
+            WHERE RESOURCE_ID=%s
             """,
-            (title, context, resource_type, resource_value, enabled, resource_id)
+            (title, context, resource_type, resource_value, purpose_id, enabled, resource_id)
         )
-        execute_query("DELETE FROM LAB_RESOURCE_COURSES WHERE RESOURCE_ID=%s", (resource_id,))
-        for course in selected_courses:
-            execute_query("INSERT INTO LAB_RESOURCE_COURSES (RESOURCE_ID, COURSE) VALUES (%s, %s)", (resource_id, course))
-        return redirect(url_for('staff.manage_resources'))
-    return render_template('staff/resource_form.html', courses=courses, resource=resource, assigned_courses=assigned_courses)
+        return redirect(url_for('staff.view_resources'))
+    return render_template('staff/resource_form.html', purposes=purposes, resource=resource)
 
 @staff_bp.route('/resources/delete/<int:resource_id>', methods=['POST'])
 @login_required
 @role_required('STAFF')
 def delete_resource(resource_id):
-    execute_query("DELETE FROM LAB_RESOURCE_COURSES WHERE RESOURCE_ID=%s", (resource_id,))
     execute_query("DELETE FROM LAB_RESOURCES WHERE RESOURCE_ID=%s", (resource_id,))
-    return redirect(url_for('staff.manage_resources'))
+    return redirect(url_for('staff.view_resources'))
 
 @staff_bp.route('/resources/toggle/<int:resource_id>', methods=['POST'])
 @login_required
@@ -1099,7 +1097,7 @@ def toggle_resource(resource_id):
     resource = execute_query("SELECT ENABLED FROM LAB_RESOURCES WHERE RESOURCE_ID=%s", (resource_id,))[0]
     new_status = not resource['ENABLED']
     execute_query("UPDATE LAB_RESOURCES SET ENABLED=%s WHERE RESOURCE_ID=%s", (new_status, resource_id))
-    return redirect(url_for('staff.manage_resources'))
+    return redirect(url_for('staff.view_resources'))
 
 @staff_bp.route('/top-participants')
 @login_required

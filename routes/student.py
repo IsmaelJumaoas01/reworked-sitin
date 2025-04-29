@@ -405,30 +405,20 @@ def feedback_history():
 @role_required('STUDENT')
 def view_resources():
     try:
-        # Get student's course
-        student_query = "SELECT COURSE FROM USERS WHERE IDNO = %s"
-        student = execute_query(student_query, (session['user_id'],))
-        
-        if not student:
-            flash('Student information not found', 'error')
-            return redirect(url_for('student.dashboard'))
-            
-        course = student[0]['COURSE']
-        
-        # Get resources for student's course
+        # Get all enabled resources with their purposes
         resources_query = """
         SELECT 
             r.*,
+            p.PURPOSE_NAME,
             CONCAT(u.FIRSTNAME, ' ', u.LASTNAME) as CREATED_BY_NAME,
             DATE_FORMAT(r.CREATED_AT, '%Y-%m-%d %H:%i') as CREATED_AT
         FROM LAB_RESOURCES r
+        JOIN PURPOSES p ON r.PURPOSE_ID = p.PURPOSE_ID
         JOIN USERS u ON r.CREATED_BY = u.IDNO
-        JOIN LAB_RESOURCE_COURSES lrc ON r.RESOURCE_ID = lrc.RESOURCE_ID
-        WHERE lrc.COURSE = %s
-        AND r.ENABLED = TRUE
+        WHERE r.ENABLED = TRUE
         ORDER BY r.CREATED_AT DESC
         """
-        resources = execute_query(resources_query, (course,))
+        resources = execute_query(resources_query)
         
         return render_template('student/resources.html', resources=resources)
     except Exception as e:
@@ -440,31 +430,21 @@ def view_resources():
 @login_required
 @role_required('STUDENT')
 def get_resource(resource_id):
-    # Get student's course
-    student_query = "SELECT COURSE FROM USERS WHERE IDNO = %s"
-    student = execute_query(student_query, (session['user_id'],))
-    
-    if not student:
-        return jsonify({'error': 'Student not found'}), 404
-    
-    student_course = student[0]['COURSE']
-    
     # Get resource details
     query = """
     SELECT 
         r.*,
-        GROUP_CONCAT(lrc.COURSE) as COURSES,
+        p.PURPOSE_NAME,
         CONCAT(u.FIRSTNAME, ' ', u.LASTNAME) as CREATED_BY
     FROM LAB_RESOURCES r
-    LEFT JOIN LAB_RESOURCE_COURSES lrc ON r.RESOURCE_ID = lrc.RESOURCE_ID
+    JOIN PURPOSES p ON r.PURPOSE_ID = p.PURPOSE_ID
     LEFT JOIN USERS u ON r.CREATED_BY = u.IDNO
-    WHERE r.RESOURCE_ID = %s AND r.ENABLED = TRUE AND lrc.COURSE = %s
-    GROUP BY r.RESOURCE_ID
+    WHERE r.RESOURCE_ID = %s AND r.ENABLED = TRUE
     """
-    resource = execute_query(query, (resource_id, student_course))
+    resource = execute_query(query, (resource_id,))
     
     if not resource:
-        return jsonify({'error': 'Resource not found or not available for your course'}), 404
+        return jsonify({'error': 'Resource not found'}), 404
     
     resource = resource[0]
     return jsonify({
@@ -472,7 +452,7 @@ def get_resource(resource_id):
         'context': resource['CONTEXT'],
         'resource_type': resource['RESOURCE_TYPE'],
         'resource_value': resource['RESOURCE_VALUE'],
-        'courses': resource['COURSES'].split(',') if resource['COURSES'] else [],
+        'purpose_name': resource['PURPOSE_NAME'],
         'created_by': resource['CREATED_BY'],
         'created_at': resource['CREATED_AT'].strftime('%Y-%m-%d %H:%M:%S')
     })

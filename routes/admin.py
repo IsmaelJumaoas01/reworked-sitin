@@ -1988,9 +1988,9 @@ def manage_resources():
             title = request.form.get('title')
             context = request.form.get('context')
             resource_type = request.form.get('resource_type')
-            courses = request.form.getlist('courses[]')
+            purpose_id = request.form.get('purpose_id')
             
-            if not title or not resource_type or not courses:
+            if not title or not resource_type or not purpose_id:
                 return jsonify({'error': 'Missing required fields'}), 400
             
             # Handle file upload
@@ -2014,37 +2014,32 @@ def manage_resources():
             
             # Insert resource
             query = """
-            INSERT INTO LAB_RESOURCES (TITLE, CONTEXT, RESOURCE_TYPE, RESOURCE_VALUE, CREATED_BY)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO LAB_RESOURCES (TITLE, CONTEXT, RESOURCE_TYPE, RESOURCE_VALUE, PURPOSE_ID, CREATED_BY)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """
-            resource_id = execute_query(query, (title, context, resource_type, resource_value, session['user_id']))
-            
-            # Insert course associations
-            for course in courses:
-                execute_query("""
-                    INSERT INTO LAB_RESOURCE_COURSES (RESOURCE_ID, COURSE)
-                    VALUES (%s, %s)
-                """, (resource_id, course))
+            resource_id = execute_query(query, (title, context, resource_type, resource_value, purpose_id, session['user_id']))
             
             return jsonify({'success': True, 'message': 'Resource added successfully'})
         except Exception as e:
             return jsonify({'error': str(e)}), 500
     
-    # Get all resources with their courses
+    # Get all resources with their purposes
     query = """
     SELECT 
         r.*,
-        GROUP_CONCAT(lrc.COURSE) as COURSES,
+        p.PURPOSE_NAME,
         CONCAT(u.FIRSTNAME, ' ', u.LASTNAME) as CREATED_BY
     FROM LAB_RESOURCES r
-    LEFT JOIN LAB_RESOURCE_COURSES lrc ON r.RESOURCE_ID = lrc.RESOURCE_ID
+    JOIN PURPOSES p ON r.PURPOSE_ID = p.PURPOSE_ID
     LEFT JOIN USERS u ON r.CREATED_BY = u.IDNO
-    GROUP BY r.RESOURCE_ID
     ORDER BY r.CREATED_AT DESC
     """
     resources = execute_query(query)
     
-    return render_template('admin/resources.html', resources=resources)
+    # Get all purposes for the form
+    purposes = execute_query("SELECT * FROM PURPOSES WHERE STATUS = 'active' ORDER BY PURPOSE_NAME")
+    
+    return render_template('admin/resources.html', resources=resources, purposes=purposes)
 
 @admin_bp.route('/resources/<int:resource_id>')
 @login_required
@@ -2054,13 +2049,12 @@ def get_resource(resource_id):
     query = """
     SELECT 
         r.*,
-        GROUP_CONCAT(lrc.COURSE) as COURSES,
+        p.PURPOSE_NAME,
         CONCAT(u.FIRSTNAME, ' ', u.LASTNAME) as CREATED_BY
     FROM LAB_RESOURCES r
-    LEFT JOIN LAB_RESOURCE_COURSES lrc ON r.RESOURCE_ID = lrc.RESOURCE_ID
+    JOIN PURPOSES p ON r.PURPOSE_ID = p.PURPOSE_ID
     LEFT JOIN USERS u ON r.CREATED_BY = u.IDNO
     WHERE r.RESOURCE_ID = %s
-    GROUP BY r.RESOURCE_ID
     """
     resource = execute_query(query, (resource_id,))
     
@@ -2073,7 +2067,8 @@ def get_resource(resource_id):
         'context': resource['CONTEXT'],
         'resource_type': resource['RESOURCE_TYPE'],
         'resource_value': resource['RESOURCE_VALUE'],
-        'courses': resource['COURSES'].split(',') if resource['COURSES'] else [],
+        'purpose_id': resource['PURPOSE_ID'],
+        'purpose_name': resource['PURPOSE_NAME'],
         'created_by': resource['CREATED_BY'],
         'created_at': resource['CREATED_AT'].strftime('%Y-%m-%d %H:%M:%S'),
         'enabled': resource['ENABLED']
@@ -2087,9 +2082,9 @@ def add_resource():
         title = request.form.get('title')
         context = request.form.get('context')
         resource_type = request.form.get('resource_type')
-        courses = request.form.getlist('courses')
+        purpose_id = request.form.get('purpose_id')
         
-        if not title or not resource_type or not courses:
+        if not title or not resource_type or not purpose_id:
             return jsonify({'error': 'Missing required fields'}), 400
         
         # Handle file upload
@@ -2103,7 +2098,7 @@ def add_resource():
             
             # Save file and get path
             filename = secure_filename(file.filename)
-            file_path = os.path.join('uploads', filename)
+            file_path = os.path.join('static', 'resources', filename)
             file.save(file_path)
             resource_value = file_path
         else:
@@ -2113,17 +2108,10 @@ def add_resource():
         
         # Insert resource
         query = """
-        INSERT INTO LAB_RESOURCES (TITLE, CONTEXT, RESOURCE_TYPE, RESOURCE_VALUE, CREATED_BY)
-        VALUES (%s, %s, %s, %s, %s)
+        INSERT INTO LAB_RESOURCES (TITLE, CONTEXT, RESOURCE_TYPE, RESOURCE_VALUE, PURPOSE_ID, CREATED_BY)
+        VALUES (%s, %s, %s, %s, %s, %s)
         """
-        resource_id = execute_query(query, (title, context, resource_type, resource_value, session['user_id']))
-        
-        # Insert course associations
-        for course in courses:
-            execute_query("""
-                INSERT INTO LAB_RESOURCE_COURSES (RESOURCE_ID, COURSE)
-                VALUES (%s, %s)
-            """, (resource_id, course))
+        resource_id = execute_query(query, (title, context, resource_type, resource_value, purpose_id, session['user_id']))
         
         return jsonify({'success': True, 'message': 'Resource added successfully'})
     except Exception as e:
@@ -2138,10 +2126,10 @@ def edit_resource():
         title = request.form.get('title')
         context = request.form.get('context')
         resource_type = request.form.get('resource_type')
-        courses = request.form.getlist('courses')
+        purpose_id = request.form.get('purpose_id')
         enabled = request.form.get('enabled') == '1'
         
-        if not resource_id or not title or not resource_type or not courses:
+        if not resource_id or not title or not resource_type or not purpose_id:
             return jsonify({'error': 'Missing required fields'}), 400
         
         # Get current resource
@@ -2165,7 +2153,7 @@ def edit_resource():
                 
                 # Save new file
                 filename = secure_filename(file.filename)
-                file_path = os.path.join('uploads', filename)
+                file_path = os.path.join('static', 'resources', filename)
                 file.save(file_path)
                 resource_value = file_path
             else:
@@ -2178,18 +2166,10 @@ def edit_resource():
         # Update resource
         query = """
         UPDATE LAB_RESOURCES 
-        SET TITLE = %s, CONTEXT = %s, RESOURCE_TYPE = %s, RESOURCE_VALUE = %s, ENABLED = %s
+        SET TITLE = %s, CONTEXT = %s, RESOURCE_TYPE = %s, RESOURCE_VALUE = %s, PURPOSE_ID = %s, ENABLED = %s
         WHERE RESOURCE_ID = %s
         """
-        execute_query(query, (title, context, resource_type, resource_value, enabled, resource_id))
-        
-        # Update course associations
-        execute_query("DELETE FROM LAB_RESOURCE_COURSES WHERE RESOURCE_ID = %s", (resource_id,))
-        for course in courses:
-            execute_query("""
-                INSERT INTO LAB_RESOURCE_COURSES (RESOURCE_ID, COURSE)
-                VALUES (%s, %s)
-            """, (resource_id, course))
+        execute_query(query, (title, context, resource_type, resource_value, purpose_id, enabled, resource_id))
         
         return jsonify({'success': True, 'message': 'Resource updated successfully'})
     except Exception as e:
@@ -2214,9 +2194,6 @@ def delete_resource(resource_id):
             file_path = resource['RESOURCE_VALUE']
             if os.path.exists(file_path):
                 os.remove(file_path)
-        
-        # Delete course associations
-        execute_query("DELETE FROM LAB_RESOURCE_COURSES WHERE RESOURCE_ID = %s", (resource_id,))
         
         # Delete resource
         execute_query("DELETE FROM LAB_RESOURCES WHERE RESOURCE_ID = %s", (resource_id,))
@@ -2922,3 +2899,117 @@ def add_lab_schedule_page():
         print("Stack trace:", traceback.format_exc())
         flash('Error loading add schedule page', 'error')
         return redirect(url_for('admin.lab_schedules'))
+
+@admin_bp.route('/computer-control')
+@login_required
+@role_required('ADMIN')
+def computer_control():
+    # Get all active laboratories
+    laboratories = execute_query("""
+        SELECT * FROM LABORATORIES 
+        WHERE STATUS = 'active' 
+        ORDER BY LAB_NAME
+    """)
+    return render_template('admin/computer_control.html', laboratories=laboratories)
+
+@admin_bp.route('/labs/<int:lab_id>')
+@login_required
+@role_required('ADMIN')
+def get_lab_info(lab_id):
+    try:
+        # Get lab information with computer counts
+        query = """
+        SELECT 
+            l.*,
+            COUNT(c.COMPUTER_ID) as total_computers,
+            SUM(CASE WHEN c.STATUS = 'available' THEN 1 ELSE 0 END) as available_computers
+        FROM LABORATORIES l
+        LEFT JOIN COMPUTERS c ON l.LAB_ID = c.LAB_ID
+        WHERE l.LAB_ID = %s
+        GROUP BY l.LAB_ID, l.LAB_NAME, l.STATUS, l.CREATED_AT
+        """
+        lab = execute_query(query, (lab_id,))
+        
+        if not lab:
+            return jsonify({'error': 'Laboratory not found'}), 404
+        
+        # Convert Decimal values to integers
+        lab_data = lab[0]
+        lab_data['total_computers'] = int(lab_data['total_computers'])
+        lab_data['available_computers'] = int(lab_data['available_computers'])
+        
+        return jsonify(lab_data)
+    except Exception as e:
+        print(f"Error in get_lab_info: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/labs/<int:lab_id>/computers')
+@login_required
+@role_required('ADMIN')
+def get_lab_computers(lab_id):
+    # Get all computers in the lab
+    computers = execute_query("""
+        SELECT * FROM COMPUTERS 
+        WHERE LAB_ID = %s 
+        ORDER BY COMPUTER_NUMBER
+    """, (lab_id,))
+    
+    return jsonify(computers)
+
+@admin_bp.route('/computers/update-status', methods=['POST'])
+@login_required
+@role_required('ADMIN')
+def update_computer_status():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+            
+        computer_id = data.get('computer_id')
+        status = data.get('status')
+        
+        if not computer_id or not status:
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        # Update computer status
+        execute_query("""
+            UPDATE COMPUTERS 
+            SET STATUS = %s
+            WHERE COMPUTER_ID = %s
+        """, (status, computer_id))
+        
+        return jsonify({'success': True, 'message': 'Computer status updated successfully'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/labs/<int:lab_id>/enable-all', methods=['POST'])
+@login_required
+@role_required('ADMIN')
+def enable_all_computers(lab_id):
+    try:
+        # Update all computers in the lab to available
+        execute_query("""
+            UPDATE COMPUTERS 
+            SET STATUS = 'available' 
+            WHERE LAB_ID = %s
+        """, (lab_id,))
+        
+        return jsonify({'success': True, 'message': 'All computers enabled successfully'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/labs/<int:lab_id>/disable-all', methods=['POST'])
+@login_required
+@role_required('ADMIN')
+def disable_all_computers(lab_id):
+    try:
+        # Update all computers in the lab to maintenance
+        execute_query("""
+            UPDATE COMPUTERS 
+            SET STATUS = 'maintenance' 
+            WHERE LAB_ID = %s
+        """, (lab_id,))
+        
+        return jsonify({'success': True, 'message': 'All computers disabled successfully'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

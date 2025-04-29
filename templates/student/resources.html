@@ -8,7 +8,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h1 class="h3 mb-0 text-gray-800">Learning Resources</h1>
-            <p class="text-muted">Access educational resources for your course</p>
+            <p class="text-muted">Access educational resources for your subjects</p>
         </div>
     </div>
 
@@ -104,6 +104,9 @@
                     <div class="d-flex align-items-center mb-3">
                         <span class="badge bg-{{ 'primary' if resource.RESOURCE_TYPE == 'file' else 'success' if resource.RESOURCE_TYPE == 'link' else 'info' if resource.RESOURCE_TYPE == 'text' else 'warning' }} me-2">
                             {{ resource.RESOURCE_TYPE }}
+                        </span>
+                        <span class="badge bg-secondary">
+                            {{ resource.PURPOSE_NAME }}
                         </span>
                     </div>
                     <p class="card-text text-muted">{{ resource.CONTEXT[:100] }}{% if resource.CONTEXT|length > 100 %}...{% endif %}</p>
@@ -224,6 +227,10 @@ function viewResource(resourceId) {
                 <div class="resource-content mb-4"></div>
                 <div class="row">
                     <div class="col-md-6">
+                        <div class="mb-3">
+                            <strong>Purpose:</strong>
+                            <span class="ms-2">${data.purpose_name}</span>
+                        </div>
                         <div class="mb-3">
                             <strong>Created By:</strong>
                             <span class="ms-2">${data.created_by}</span>

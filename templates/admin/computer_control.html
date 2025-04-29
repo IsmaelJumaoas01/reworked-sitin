@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+
+{% block title %}Computer Control{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h4 class="text-muted mb-3">Monitor and manage computer status in each laboratory</h4>
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="lab-select-container" style="width: 300px;">
+                    <label class="text-primary fw-bold mb-2">Select Laboratory</label>
+                    <select class="form-select form-select-lg" id="labSelect" onchange="loadLabComputers()">
+                        <option value="">Select a laboratory...</option>
+                        {% for lab in laboratories %}
+                        <option value="{{ lab.LAB_ID }}">{{ lab.LAB_NAME }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-success btn-lg" onclick="enableAllComputers()">
+                        <i class="fas fa-check-circle me-2"></i>Enable All
+                    </button>
+                    <button type="button" class="btn btn-danger btn-lg" onclick="disableAllComputers()">
+                        <i class="fas fa-times-circle me-2"></i>Disable All
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="flex-shrink-0 me-3">
+                        <i class="fas fa-desktop fa-2x text-primary"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-primary mb-1">TOTAL COMPUTERS</h6>
+                        <h2 class="mb-0" id="totalComputers">50</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="flex-shrink-0 me-3">
+                        <i class="fas fa-check-circle fa-2x text-success"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-success mb-1">AVAILABLE</h6>
+                        <h2 class="mb-0" id="availableComputers">50</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="flex-shrink-0 me-3">
+                        <i class="fas fa-user fa-2x text-warning"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-warning mb-1">IN USE</h6>
+                        <h2 class="mb-0" id="inUseComputers">0</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="computer-grid" id="computerGrid">
+                <!-- Computers will be loaded here dynamically -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+.computer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1rem;
+    padding: 1rem;
+}
+
+.computer-item {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.computer-item:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.computer-number {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #333;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.status-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.status-button {
+    border: none;
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.status-button.available {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.status-button.available.active {
+    background-color: #2e7d32;
+    color: white;
+}
+
+.status-button.in_use {
+    background-color: #fff3e0;
+    color: #f57c00;
+}
+
+.status-button.in_use.active {
+    background-color: #f57c00;
+    color: white;
+}
+
+.status-button.maintenance {
+    background-color: #ffebee;
+    color: #c62828;
+}
+
+.status-button.maintenance.active {
+    background-color: #c62828;
+    color: white;
+}
+
+.status-button i {
+    font-size: 1rem;
+}
+
+.form-select-lg {
+    height: 50px;
+    font-size: 1rem;
+}
+
+.card {
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+@media (max-width: 768px) {
+    .computer-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    }
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentLabId = null;
+
+function loadLabComputers() {
+    const labId = document.getElementById('labSelect').value;
+    if (!labId) return;
+    
+    currentLabId = labId;
+    
+    // Load lab information
+    fetch(`/admin/labs/${labId}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('totalComputers').textContent = data.total_computers;
+            document.getElementById('availableComputers').textContent = data.available_computers;
+            document.getElementById('inUseComputers').textContent = data.total_computers - data.available_computers;
+        })
+        .catch(error => {
+            console.error('Error loading lab info:', error);
+        });
+    
+    // Load computers
+    fetch(`/admin/labs/${labId}/computers`)
+        .then(response => response.json())
+        .then(computers => {
+            const grid = document.getElementById('computerGrid');
+            grid.innerHTML = '';
+            
+            computers.forEach(computer => {
+                const computerElement = document.createElement('div');
+                computerElement.className = 'computer-item';
+                computerElement.innerHTML = `
+                    <span class="computer-number">PC-${String(computer.COMPUTER_NUMBER).padStart(2, '0')}</span>
+                    <div class="status-buttons">
+                        <button class="status-button available ${computer.STATUS === 'available' ? 'active' : ''}" 
+                                onclick="setComputerStatus(${computer.COMPUTER_ID}, 'available')">
+                            <i class="fas fa-check"></i> Available
+                        </button>
+                        <button class="status-button in_use ${computer.STATUS === 'in_use' ? 'active' : ''}"
+                                onclick="setComputerStatus(${computer.COMPUTER_ID}, 'in_use')">
+                            <i class="fas fa-user"></i> In Use
+                        </button>
+                        <button class="status-button maintenance ${computer.STATUS === 'maintenance' ? 'active' : ''}"
+                                onclick="setComputerStatus(${computer.COMPUTER_ID}, 'maintenance')">
+                            <i class="fas fa-tools"></i> Maintenance
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(computerElement);
+            });
+        })
+        .catch(error => {
+            console.error('Error loading computers:', error);
+        });
+}
+
+function setComputerStatus(computerId, status) {
+    fetch('/admin/computers/update-status', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            computer_id: computerId,
+            status: status
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            loadLabComputers();
+        } else {
+            alert(data.error || 'An error occurred');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while updating computer status');
+    });
+}
+
+function enableAllComputers() {
+    if (!currentLabId) {
+        alert('Please select a laboratory first');
+        return;
+    }
+    
+    if (confirm('Are you sure you want to enable all computers in this laboratory?')) {
+        fetch(`/admin/labs/${currentLabId}/enable-all`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                loadLabComputers();
+            } else {
+                alert(data.error || 'An error occurred');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while enabling computers');
+        });
+    }
+}
+
+function disableAllComputers() {
+    if (!currentLabId) {
+        alert('Please select a laboratory first');
+        return;
+    }
+    
+    if (confirm('Are you sure you want to disable all computers in this laboratory?')) {
+        fetch(`/admin/labs/${currentLabId}/disable-all`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                loadLabComputers();
+            } else {
+                alert(data.error || 'An error occurred');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while disabling computers');
+        });
+    }
+}
+</script>
+{% endblock %} 

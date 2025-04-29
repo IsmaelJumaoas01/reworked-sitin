@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import hashlib
 import random
 from datetime import datetime
+import time
 
 # Load environment variables
 load_dotenv()
@@ -180,6 +181,91 @@ def insert_default_data():
             """, announcement)
         print(f"Inserted {len(announcements)} announcements")
         
+        # Insert default resources for each purpose
+        print("\nInserting default resources...")
+        try:
+            # First check if admin user exists
+            admin_check = execute_query("SELECT IDNO FROM USERS WHERE IDNO = 'ADMIN001'")
+            if not admin_check:
+                print("Warning: Admin user not found. Creating default admin...")
+                execute_query("""
+                    INSERT INTO USERS (IDNO, LASTNAME, FIRSTNAME, COURSE, YEAR, EMAIL, PASSWORD, USER_TYPE)
+                    VALUES ('ADMIN001', 'Admin', 'System', 'N/A', 0, 'admin@system.com', 
+                           SHA2('admin123', 256), 'ADMIN')
+                """)
+            
+            # Set a shorter timeout for resource insertion
+            connection = get_db_connection()
+            if connection:
+                cursor = connection.cursor()
+                cursor.execute("SET SESSION innodb_lock_wait_timeout = 5")  # 5 second timeout
+                cursor.close()
+                connection.close()
+            
+            default_resources = [
+                ('C Programming Basics', 'Introduction to C programming language', 'link', 'https://www.tutorialspoint.com/cprogramming/index.htm', 'C PROGRAMMING'),
+                ('C Programming Examples', 'Collection of C programming examples', 'link', 'https://www.programiz.com/c-programming/examples', 'C PROGRAMMING'),
+                ('Java Tutorial', 'Complete Java programming tutorial', 'link', 'https://www.w3schools.com/java/', 'JAVA PROGRAMMING'),
+                ('Java Examples', 'Java programming examples and exercises', 'link', 'https://www.javatpoint.com/java-programs', 'JAVA PROGRAMMING'),
+                ('Python Documentation', 'Official Python documentation', 'link', 'https://docs.python.org/3/', 'PYTHON'),
+                ('Python Tutorial', 'Python programming tutorial', 'link', 'https://www.python.org/about/gettingstarted/', 'PYTHON'),
+                ('C# Documentation', 'Microsoft C# documentation', 'link', 'https://docs.microsoft.com/en-us/dotnet/csharp/', 'C#'),
+                ('C# Tutorial', 'C# programming tutorial', 'link', 'https://www.tutorialspoint.com/csharp/index.htm', 'C#'),
+                ('SQL Tutorial', 'SQL database tutorial', 'link', 'https://www.w3schools.com/sql/', 'DATABASE'),
+                ('Database Design', 'Database design principles', 'link', 'https://www.tutorialspoint.com/dbms/index.htm', 'DATABASE'),
+                ('Digital Logic Tutorial', 'Digital logic design tutorial', 'link', 'https://www.tutorialspoint.com/digital_circuits/index.htm', 'DIGITAL AND LOGIC DESIGN'),
+                ('Logic Gates', 'Understanding logic gates', 'link', 'https://www.electronics-tutorials.ws/logic/logic_1.html', 'DIGITAL AND LOGIC DESIGN'),
+                ('Embedded Systems Guide', 'Introduction to embedded systems', 'link', 'https://www.tutorialspoint.com/embedded_systems/index.htm', 'EMBEDDED SYSTEMS AND IOT'),
+                ('IoT Basics', 'Internet of Things fundamentals', 'link', 'https://www.tutorialspoint.com/internet_of_things/index.htm', 'EMBEDDED SYSTEMS AND IOT'),
+                ('System Architecture', 'System architecture principles', 'link', 'https://www.tutorialspoint.com/software_architecture_design/index.htm', 'SYSTEM INTEGRATION AND ARCHITECTURE'),
+                ('Integration Patterns', 'System integration patterns', 'link', 'https://www.enterpriseintegrationpatterns.com/', 'SYSTEM INTEGRATION AND ARCHITECTURE'),
+                ('Office Applications', 'Microsoft Office tutorials', 'link', 'https://support.microsoft.com/en-us/office', 'COMPUTER APPLICATION'),
+                ('Productivity Tools', 'Productivity software guide', 'link', 'https://www.tutorialspoint.com/computer_fundamentals/index.htm', 'COMPUTER APPLICATION'),
+                ('Project Management Guide', 'Project management fundamentals', 'link', 'https://www.pmi.org/learning/library', 'PROJECT MANAGEMENT'),
+                ('Agile Methodology', 'Agile project management', 'link', 'https://www.agilealliance.org/agile101/', 'PROJECT MANAGEMENT'),
+                ('Tech Trends', 'Latest IT trends and innovations', 'link', 'https://www.gartner.com/en/information-technology/insights/top-technology-trends', 'IT TRENDS'),
+                ('Future of IT', 'Future technology predictions', 'link', 'https://www.mckinsey.com/business-functions/mckinsey-digital/our-insights', 'IT TRENDS'),
+                ('Startup Guide', 'Guide to starting a tech business', 'link', 'https://www.startupgrind.com/blog/', 'TECHNOPRENEURSHIP'),
+                ('Tech Entrepreneurship', 'Technology entrepreneurship resources', 'link', 'https://www.entrepreneur.com/technology', 'TECHNOPRENEURSHIP'),
+                ('Capstone Project Guide', 'Guide to capstone projects', 'link', 'https://www.capstone.org/', 'CAPSTONE'),
+                ('Project Planning', 'Project planning and execution', 'link', 'https://www.projectmanagement.com/', 'CAPSTONE')
+            ]
+            
+            # Get all purposes first to avoid repeated queries
+            purposes_query = "SELECT PURPOSE_ID, PURPOSE_NAME FROM PURPOSES WHERE STATUS = 'active'"
+            purposes = execute_query(purposes_query)
+            if not purposes:
+                print("Error: No active purposes found. Cannot insert resources.")
+                return
+                
+            purpose_map = {p['PURPOSE_NAME']: p['PURPOSE_ID'] for p in purposes}
+            
+            # Insert resources with timeout handling
+            for title, context, resource_type, resource_value, purpose_name in default_resources:
+                try:
+                    if purpose_name not in purpose_map:
+                        print(f"Warning: Purpose '{purpose_name}' not found. Skipping resource.")
+                        continue
+                        
+                    purpose_id = purpose_map[purpose_name]
+                    execute_query("""
+                        INSERT INTO LAB_RESOURCES 
+                        (TITLE, CONTEXT, RESOURCE_TYPE, RESOURCE_VALUE, PURPOSE_ID, CREATED_BY, ENABLED)
+                        VALUES (%s, %s, %s, %s, %s, 'ADMIN001', TRUE)
+                    """, (title, context, resource_type, resource_value, purpose_id))
+                    print(f"Inserted: {title}")
+                except Exception as e:
+                    print(f"Error inserting resource '{title}': {str(e)}")
+                    continue
+                
+                # Add a small delay between insertions
+                time.sleep(0.1)
+            
+            print("Default resources inserted successfully!")
+        except Exception as e:
+            print(f"\nError in resource insertion: {str(e)}")
+            print("Continuing with other initialization...")
+        
         print("\nDefault data inserted successfully!")
     except Exception as e:
         print(f"\nError inserting default data: {str(e)}")
@@ -343,23 +429,18 @@ def init_db():
                 CONTEXT TEXT,
                 RESOURCE_TYPE ENUM('file', 'link', 'text', 'image') NOT NULL,
                 RESOURCE_VALUE TEXT NOT NULL,
+                PURPOSE_ID INT NOT NULL,
                 ENABLED BOOLEAN DEFAULT TRUE,
                 CREATED_BY VARCHAR(20) NOT NULL,
                 CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UPDATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                FOREIGN KEY (CREATED_BY) REFERENCES USERS(IDNO)
+                FOREIGN KEY (CREATED_BY) REFERENCES USERS(IDNO),
+                FOREIGN KEY (PURPOSE_ID) REFERENCES PURPOSES(PURPOSE_ID)
             )
         """)
 
-        # Create join table for lab_resource_courses (many-to-many)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS LAB_RESOURCE_COURSES (
-                RESOURCE_ID INT NOT NULL,
-                COURSE VARCHAR(10) NOT NULL,
-                PRIMARY KEY (RESOURCE_ID, COURSE),
-                FOREIGN KEY (RESOURCE_ID) REFERENCES LAB_RESOURCES(RESOURCE_ID)
-            )
-        """)
+        # Remove the lab_resource_courses table since we're not using it anymore
+        cursor.execute("DROP TABLE IF EXISTS LAB_RESOURCE_COURSES")
         
         # Create lab schedules table
         cursor.execute("""
@@ -375,13 +456,6 @@ def init_db():
                 FOREIGN KEY (LAB_ID) REFERENCES LABORATORIES(LAB_ID),
                 FOREIGN KEY (PURPOSE_ID) REFERENCES PURPOSES(PURPOSE_ID) ON DELETE CASCADE
             )
-        """)
-        
-        # Create default admin user if not exists
-        cursor.execute("""
-            INSERT IGNORE INTO USERS (IDNO, LASTNAME, FIRSTNAME, COURSE, YEAR, EMAIL, PASSWORD, USER_TYPE)
-            VALUES ('ADMIN001', 'Admin', 'System', 'N/A', 0, 'admin@system.com', 
-                   SHA2('admin123', 256), 'ADMIN')
         """)
         
         # Insert default data
@@ -474,13 +548,13 @@ def init_db():
                         available_purposes = purposes.copy()
                         random.shuffle(available_purposes)
                         
-                        # Add schedule for this time slot
-                        for purpose in available_purposes[:2]:  # Add up to 2 purposes per time slot
+                        # Add schedule for this time slot - only one purpose per slot
+                        if available_purposes:
                             cursor.execute("""
                                 INSERT INTO LAB_SCHEDULES 
                                 (LAB_ID, PURPOSE_ID, DAY_OF_WEEK, START_TIME, END_TIME, STATUS)
                                 VALUES (%s, %s, %s, %s, %s, 'active')
-                            """, (lab['LAB_ID'], purpose['PURPOSE_ID'], day, start_time, end_time))
+                            """, (lab['LAB_ID'], available_purposes[0]['PURPOSE_ID'], day, start_time, end_time))
                         
                         total_hours_scheduled += duration
                         

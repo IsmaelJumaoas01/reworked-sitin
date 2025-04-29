@@ -105,6 +105,20 @@
                     </div>
                     <div class="col-md-6">
                         <div class="mb-3">
+                            <label for="purpose_id" class="form-label">Purpose</label>
+                            <select class="form-select" id="purpose_id" name="purpose_id" required>
+                                <option value="">Select purpose...</option>
+                                {% for purpose in purposes %}
+                                <option value="{{ purpose.PURPOSE_ID }}">{{ purpose.PURPOSE_NAME }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
                             <label for="resource_type" class="form-label">Resource Type</label>
                             <select class="form-select" id="resource_type" name="resource_type" required onchange="toggleResourceSection()">
                                 <option value="">Select type...</option>
@@ -231,7 +245,7 @@
                     <p class="card-text text-muted">{{ resource.CONTEXT[:100] }}{% if resource.CONTEXT|length > 100 %}...{% endif %}</p>
                     <div class="mt-3">
                         <small class="text-muted">
-                            <i class="fas fa-users me-1"></i>Available for: {{ resource.COURSES }}
+                            <i class="fas fa-book me-1"></i>Purpose: {{ resource.PURPOSE_NAME }}
                         </small>
                     </div>
                 </div>
@@ -422,73 +436,31 @@ function viewResource(resourceId) {
                     </div>
                     <div class="resource-view-body">
                         <p class="text-muted">${data.context}</p>
-                        <div class="resource-content mb-4"></div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <strong>Available Courses:</strong>
-                                    <span class="ms-2">${data.courses.join(', ')}</span>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <strong>Created By:</strong>
-                                    <span class="ms-2">${data.created_by}</span>
-                                </div>
-                                <div class="mb-3">
-                                    <strong>Created At:</strong>
-                                    <span class="ms-2">${data.created_at}</span>
-                                </div>
-                            </div>
+                        <div class="resource-content mb-4">
+                            ${data.resource_type === 'file' ? 
+                                `<a href="${data.resource_value}" class="btn btn-primary" target="_blank">Download File</a>` :
+                            data.resource_type === 'link' ? 
+                                `<a href="${data.resource_value}" class="btn btn-primary" target="_blank">Open Link</a>` :
+                            data.resource_type === 'text' ? 
+                                `<div class="p-3 bg-light">${data.resource_value}</div>` :
+                            data.resource_type === 'image' ? 
+                                `<img src="${data.resource_value}" class="img-fluid" alt="${data.title}">` :
+                                ''}
+                        </div>
+                        <div class="resource-details">
+                            <p><strong>Purpose:</strong> ${data.purpose_name}</p>
+                            <p><strong>Created By:</strong> ${data.created_by}</p>
+                            <p><strong>Created At:</strong> ${data.created_at}</p>
+                            <p><strong>Status:</strong> ${data.enabled ? 'Enabled' : 'Disabled'}</p>
                         </div>
                     </div>
                 </div>
             `;
-            
-            const contentDiv = overlay.querySelector('.resource-content');
-            switch(data.resource_type) {
-                case 'file':
-                    contentDiv.innerHTML = `
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-file fa-2x me-3 text-primary"></i>
-                            <a href="${data.resource_value}" class="btn btn-primary" target="_blank">
-                                <i class="fas fa-download me-2"></i>Download File
-                            </a>
-                        </div>
-                    `;
-                    break;
-                case 'link':
-                    contentDiv.innerHTML = `
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-link fa-2x me-3 text-primary"></i>
-                            <a href="${data.resource_value}" class="btn btn-primary" target="_blank">
-                                <i class="fas fa-external-link-alt me-2"></i>Open Link
-                            </a>
-                        </div>
-                    `;
-                    break;
-                case 'text':
-                    contentDiv.innerHTML = `
-                        <div class="p-3 bg-light rounded">
-                            <i class="fas fa-file-alt fa-2x me-3 text-primary"></i>
-                            ${data.resource_value}
-                        </div>
-                    `;
-                    break;
-                case 'image':
-                    contentDiv.innerHTML = `
-                        <div class="text-center">
-                            <img src="${data.resource_value}" class="img-fluid rounded" alt="${data.title}">
-                        </div>
-                    `;
-                    break;
-            }
-            
             document.body.appendChild(overlay);
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred while fetching the resource');
+            alert('An error occurred while viewing the resource');
         });
 }
 
@@ -496,26 +468,53 @@ function editResource(resourceId) {
     fetch(`/admin/resources/${resourceId}`)
         .then(response => response.json())
         .then(data => {
-            document.getElementById('resource_id').value = resourceId;
-            document.getElementById('title').value = data.title;
-            document.getElementById('context').value = data.context;
-            document.getElementById('resource_type').value = data.resource_type;
-            document.getElementById('courses').value = data.courses;
+            document.getElementById('edit_resource_id').value = data.resource_id;
+            document.getElementById('edit_title').value = data.title;
+            document.getElementById('edit_context').value = data.context;
+            document.getElementById('edit_resource_type').value = data.resource_type;
+            document.getElementById('edit_purpose_id').value = data.purpose_id;
+            document.getElementById('edit_enabled').checked = data.enabled;
             
-            // Set resource value based on type
+            // Update resource value container based on type
+            const container = document.getElementById('edit_resource_value_container');
+            container.innerHTML = '';
+            
             switch(data.resource_type) {
+                case 'file':
+                    container.innerHTML = `
+                        <label class="form-label">Current File</label>
+                        <div class="mb-2">
+                            <a href="${data.resource_value}" target="_blank">View Current File</a>
+                        </div>
+                        <label for="edit_file" class="form-label">Upload New File</label>
+                        <input type="file" class="form-control" id="edit_file" name="file">
+                    `;
+                    break;
                 case 'link':
-                    document.getElementById('link_value').value = data.resource_value;
+                    container.innerHTML = `
+                        <label for="edit_resource_value" class="form-label">Resource Link</label>
+                        <input type="url" class="form-control" id="edit_resource_value" name="resource_value" value="${data.resource_value}" required>
+                    `;
                     break;
                 case 'text':
-                    document.getElementById('text_value').value = data.resource_value;
+                    container.innerHTML = `
+                        <label for="edit_resource_value" class="form-label">Resource Text</label>
+                        <textarea class="form-control" id="edit_resource_value" name="resource_value" rows="5" required>${data.resource_value}</textarea>
+                    `;
+                    break;
+                case 'image':
+                    container.innerHTML = `
+                        <label class="form-label">Current Image</label>
+                        <div class="mb-2">
+                            <img src="${data.resource_value}" class="img-fluid" style="max-height: 200px;">
+                        </div>
+                        <label for="edit_file" class="form-label">Upload New Image</label>
+                        <input type="file" class="form-control" id="edit_file" name="file" accept="image/*">
+                    `;
                     break;
             }
             
-            document.getElementById('formTitle').textContent = 'Edit Resource';
-            document.getElementById('resourceFormSection').style.display = 'block';
-            toggleResourceSection();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            $('#editResourceModal').modal('show');
         })
         .catch(error => {
             console.error('Error:', error);
