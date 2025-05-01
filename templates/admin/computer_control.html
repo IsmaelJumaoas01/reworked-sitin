@@ -2,12 +2,16 @@
 
 {% block title %}Computer Control{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/computer-control.css') }}">
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
     <div class="row mb-4">
         <div class="col-12">
             <h4 class="text-muted mb-3">Monitor and manage computer status in each laboratory</h4>
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
                 <div class="lab-select-container" style="width: 300px;">
                     <label class="text-primary fw-bold mb-2">Select Laboratory</label>
                     <select class="form-select form-select-lg" id="labSelect" onchange="loadLabComputers()">
@@ -30,7 +34,7 @@
     </div>
 
     <div class="row mb-4">
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card h-100">
                 <div class="card-body d-flex align-items-center">
                     <div class="flex-shrink-0 me-3">
@@ -38,12 +42,12 @@
                     </div>
                     <div>
                         <h6 class="text-primary mb-1">TOTAL COMPUTERS</h6>
-                        <h2 class="mb-0" id="totalComputers">50</h2>
+                        <h2 class="mb-0" id="totalComputers">0</h2>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card h-100">
                 <div class="card-body d-flex align-items-center">
                     <div class="flex-shrink-0 me-3">
@@ -51,12 +55,12 @@
                     </div>
                     <div>
                         <h6 class="text-success mb-1">AVAILABLE</h6>
-                        <h2 class="mb-0" id="availableComputers">50</h2>
+                        <h2 class="mb-0" id="availableComputers">0</h2>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card h-100">
                 <div class="card-body d-flex align-items-center">
                     <div class="flex-shrink-0 me-3">
@@ -69,122 +73,49 @@
                 </div>
             </div>
         </div>
+        <div class="col-md-3">
+            <div class="card h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="flex-shrink-0 me-3">
+                        <i class="fas fa-tools fa-2x text-danger"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-danger mb-1">MAINTENANCE</h6>
+                        <h2 class="mb-0" id="maintenanceComputers">0</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="card">
-        <div class="card-body">
-            <div class="computer-grid" id="computerGrid">
-                <!-- Computers will be loaded here dynamically -->
+        <div class="card-body p-4">
+            <div class="computer-lab-container">
+                <div id="computerGrid" class="computer-lab-wrapper">
+                    <!-- Computers will be loaded here dynamically -->
+                </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Status Menu Overlay -->
+<div id="statusMenuOverlay" class="status-menu-overlay" onclick="closeStatusMenu(event)">
+    <div class="status-menu">
+        <div class="status-menu-header">
+            <h3 class="status-menu-title">Change Status</h3>
+        </div>
+        <div id="statusMenuOptions">
+            <!-- Options will be added dynamically -->
         </div>
     </div>
 </div>
 {% endblock %}
 
-{% block styles %}
-<style>
-.computer-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 1rem;
-    padding: 1rem;
-}
-
-.computer-item {
-    background: #fff;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    padding: 1rem;
-    text-align: left;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.computer-item:hover {
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-.computer-number {
-    font-size: 1rem;
-    font-weight: 500;
-    color: #333;
-    display: block;
-    margin-bottom: 0.5rem;
-}
-
-.status-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.status-button {
-    border: none;
-    padding: 0.5rem;
-    border-radius: 4px;
-    font-size: 0.875rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    transition: all 0.2s ease;
-    cursor: pointer;
-}
-
-.status-button.available {
-    background-color: #e8f5e9;
-    color: #2e7d32;
-}
-
-.status-button.available.active {
-    background-color: #2e7d32;
-    color: white;
-}
-
-.status-button.in_use {
-    background-color: #fff3e0;
-    color: #f57c00;
-}
-
-.status-button.in_use.active {
-    background-color: #f57c00;
-    color: white;
-}
-
-.status-button.maintenance {
-    background-color: #ffebee;
-    color: #c62828;
-}
-
-.status-button.maintenance.active {
-    background-color: #c62828;
-    color: white;
-}
-
-.status-button i {
-    font-size: 1rem;
-}
-
-.form-select-lg {
-    height: 50px;
-    font-size: 1rem;
-}
-
-.card {
-    border: none;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-
-@media (max-width: 768px) {
-    .computer-grid {
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    }
-}
-</style>
-{% endblock %}
-
 {% block scripts %}
 <script>
 let currentLabId = null;
+let currentComputerId = null;
 
 function loadLabComputers() {
     const labId = document.getElementById('labSelect').value;
@@ -198,7 +129,8 @@ function loadLabComputers() {
         .then(data => {
             document.getElementById('totalComputers').textContent = data.total_computers;
             document.getElementById('availableComputers').textContent = data.available_computers;
-            document.getElementById('inUseComputers').textContent = data.total_computers - data.available_computers;
+            document.getElementById('inUseComputers').textContent = data.in_use_computers;
+            document.getElementById('maintenanceComputers').textContent = data.maintenance_computers;
         })
         .catch(error => {
             console.error('Error loading lab info:', error);
@@ -207,39 +139,68 @@ function loadLabComputers() {
     // Load computers
     fetch(`/admin/labs/${labId}/computers`)
         .then(response => response.json())
-        .then(computers => {
+        .then(data => {
             const grid = document.getElementById('computerGrid');
             grid.innerHTML = '';
             
-            computers.forEach(computer => {
-                const computerElement = document.createElement('div');
-                computerElement.className = 'computer-item';
-                computerElement.innerHTML = `
-                    <span class="computer-number">PC-${String(computer.COMPUTER_NUMBER).padStart(2, '0')}</span>
-                    <div class="status-buttons">
-                        <button class="status-button available ${computer.STATUS === 'available' ? 'active' : ''}" 
-                                onclick="setComputerStatus(${computer.COMPUTER_ID}, 'available')">
-                            <i class="fas fa-check"></i> Available
-                        </button>
-                        <button class="status-button in_use ${computer.STATUS === 'in_use' ? 'active' : ''}"
-                                onclick="setComputerStatus(${computer.COMPUTER_ID}, 'in_use')">
-                            <i class="fas fa-user"></i> In Use
-                        </button>
-                        <button class="status-button maintenance ${computer.STATUS === 'maintenance' ? 'active' : ''}"
-                                onclick="setComputerStatus(${computer.COMPUTER_ID}, 'maintenance')">
-                            <i class="fas fa-tools"></i> Maintenance
-                        </button>
-                    </div>
-                `;
-                grid.appendChild(computerElement);
+            if (!data || data.length === 0) {
+                grid.innerHTML = '<div class="text-center text-muted p-4">No computers found in this laboratory</div>';
+                return;
+            }
+            
+            data.forEach(computer => {
+                grid.appendChild(createComputerElement(computer));
             });
         })
         .catch(error => {
             console.error('Error loading computers:', error);
+            const grid = document.getElementById('computerGrid');
+            grid.innerHTML = '<div class="text-center text-danger p-4">Error loading computers</div>';
         });
 }
 
-function setComputerStatus(computerId, status) {
+function createComputerElement(computer) {
+    const div = document.createElement('div');
+    div.className = `computer-box ${computer.STATUS.toLowerCase()}`;
+    div.innerHTML = `
+        <div class="computer-status"></div>
+        <div class="computer-icon">
+            <i class="fas fa-desktop"></i>
+        </div>
+        <div class="computer-number">PC ${String(computer.COMPUTER_NUMBER).padStart(2, '0')}</div>
+    `;
+    div.onclick = () => showStatusMenu(computer);
+    return div;
+}
+
+function showStatusMenu(computer) {
+    currentComputerId = computer.COMPUTER_ID;
+    const overlay = document.getElementById('statusMenuOverlay');
+    const options = document.getElementById('statusMenuOptions');
+    
+    options.innerHTML = `
+        <div class="menu-option available" onclick="updateComputerStatus(${computer.COMPUTER_ID}, 'available')">
+            <i class="fas fa-check-circle"></i> Available
+        </div>
+        <div class="menu-option in_use" onclick="updateComputerStatus(${computer.COMPUTER_ID}, 'in_use')">
+            <i class="fas fa-user"></i> In Use
+        </div>
+        <div class="menu-option maintenance" onclick="updateComputerStatus(${computer.COMPUTER_ID}, 'maintenance')">
+            <i class="fas fa-tools"></i> Maintenance
+        </div>
+    `;
+    
+    overlay.classList.add('active');
+}
+
+function closeStatusMenu(event) {
+    if (event.target.id === 'statusMenuOverlay') {
+        document.getElementById('statusMenuOverlay').classList.remove('active');
+        currentComputerId = null;
+    }
+}
+
+function updateComputerStatus(computerId, status) {
     fetch('/admin/computers/update-status', {
         method: 'POST',
         headers: {
@@ -253,14 +214,14 @@ function setComputerStatus(computerId, status) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            document.getElementById('statusMenuOverlay').classList.remove('active');
             loadLabComputers();
         } else {
-            alert(data.error || 'An error occurred');
+            console.error('Error updating computer status:', data.error);
         }
     })
     .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred while updating computer status');
+        console.error('Error updating computer status:', error);
     });
 }
 
@@ -279,12 +240,11 @@ function enableAllComputers() {
             if (data.success) {
                 loadLabComputers();
             } else {
-                alert(data.error || 'An error occurred');
+                console.error('Error enabling computers:', data.error);
             }
         })
         .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred while enabling computers');
+            console.error('Error enabling computers:', error);
         });
     }
 }
@@ -304,14 +264,29 @@ function disableAllComputers() {
             if (data.success) {
                 loadLabComputers();
             } else {
-                alert(data.error || 'An error occurred');
+                console.error('Error disabling computers:', data.error);
             }
         })
         .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred while disabling computers');
+            console.error('Error disabling computers:', error);
         });
     }
 }
+
+// Load computers when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    const labSelect = document.getElementById('labSelect');
+    if (labSelect.value) {
+        loadLabComputers();
+    }
+});
+
+// Close menu when pressing Escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        document.getElementById('statusMenuOverlay').classList.remove('active');
+        currentComputerId = null;
+    }
+});
 </script>
 {% endblock %} 

@@ -251,7 +251,7 @@ function viewResource(resourceId) {
                     contentDiv.innerHTML = `
                         <div class="d-flex align-items-center">
                             <i class="fas fa-file fa-2x me-3 text-primary"></i>
-                            <a href="${data.resource_value}" class="btn btn-primary" target="_blank">
+                            <a href="/student/resources/${resourceId}/file" class="btn btn-primary" target="_blank">
                                 <i class="fas fa-download me-2"></i>Download File
                             </a>
                         </div>
@@ -278,7 +278,7 @@ function viewResource(resourceId) {
                 case 'image':
                     contentDiv.innerHTML = `
                         <div class="text-center">
-                            <img src="${data.resource_value}" class="img-fluid rounded" alt="${data.title}">
+                            <img src="/student/resources/${resourceId}/view" class="img-fluid rounded" alt="${data.title}">
                         </div>
                     `;
                     break;

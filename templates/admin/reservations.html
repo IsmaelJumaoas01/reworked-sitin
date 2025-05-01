@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header">
+            <h4 class="mb-0">Pending Reservations</h4>
+        </div>
+        <div class="card-body">
+            {% if reservations %}
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID Number</th>
+                            <th>Student Name</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Laboratory</th>
+                            <th>Computer</th>
+                            <th>Purpose</th>
+                            <th>Program</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for reservation in reservations %}
+                        <tr>
+                            <td>{{ reservation.USER_IDNO }}</td>
+                            <td>{{ reservation.FIRSTNAME }} {{ reservation.LASTNAME }}</td>
+                            <td>{{ reservation.RESERVATION_DATE }}</td>
+                            <td>{{ reservation.TIME_IN }} - {{ reservation.TIME_OUT }}</td>
+                            <td>{{ reservation.LAB_NAME }}</td>
+                            <td>PC {{ reservation.COMPUTER_ID }}</td>
+                            <td>{{ reservation.PURPOSE_NAME }}</td>
+                            <td>{{ reservation.PROGRAM }}</td>
+                            <td>
+                                <div class="btn-group">
+                                    <button class="btn btn-success btn-sm" 
+                                            onclick="handleReservation('{{ reservation.RESERVATION_ID }}', 'approve')">
+                                        Approve
+                                    </button>
+                                    <button class="btn btn-danger btn-sm" 
+                                            onclick="handleReservation('{{ reservation.RESERVATION_ID }}', 'deny')">
+                                        Deny
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                No pending reservations found.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function handleReservation(reservationId, action) {
+    if (!confirm(`Are you sure you want to ${action} this reservation?`)) {
+        return;
+    }
+    
+    fetch(`/admin/reservation/${reservationId}/${action}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+        } else {
+            alert(`Reservation ${action}d successfully!`);
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred. Please try again.');
+    });
+}
+</script>
+{% endblock %} 

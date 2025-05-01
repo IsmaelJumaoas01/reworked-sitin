@@ -7,6 +7,7 @@ from io import BytesIO
 from routes.auth import login_required, role_required
 from datetime import datetime
 import mysql.connector
+import io
 
 student_bp = Blueprint('student', __name__, url_prefix='/student')
 
@@ -456,6 +457,60 @@ def get_resource(resource_id):
         'created_by': resource['CREATED_BY'],
         'created_at': resource['CREATED_AT'].strftime('%Y-%m-%d %H:%M:%S')
     })
+
+@student_bp.route('/resources/<int:resource_id>/file')
+@login_required
+@role_required('STUDENT')
+def get_resource_file(resource_id):
+    try:
+        query = """
+            SELECT RESOURCE_FILE, FILE_NAME, FILE_TYPE 
+            FROM LAB_RESOURCES 
+            WHERE RESOURCE_ID = %s AND RESOURCE_TYPE IN ('file', 'image') AND ENABLED = TRUE
+        """
+        result = execute_query(query, (resource_id,))
+        
+        if not result or not result[0]['RESOURCE_FILE']:
+            return jsonify({'success': False, 'error': 'File not found'}), 404
+        
+        file_data = result[0]
+        return send_file(
+            io.BytesIO(file_data['RESOURCE_FILE']),
+            mimetype=file_data['FILE_TYPE'],
+            as_attachment=True,
+            download_name=file_data['FILE_NAME']
+        )
+        
+    except Exception as e:
+        print(f"Error retrieving file: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@student_bp.route('/resources/<int:resource_id>/view')
+@login_required
+@role_required('STUDENT')
+def view_resource_file(resource_id):
+    try:
+        query = """
+            SELECT RESOURCE_FILE, FILE_NAME, FILE_TYPE 
+            FROM LAB_RESOURCES 
+            WHERE RESOURCE_ID = %s AND RESOURCE_TYPE IN ('file', 'image') AND ENABLED = TRUE
+        """
+        result = execute_query(query, (resource_id,))
+        
+        if not result or not result[0]['RESOURCE_FILE']:
+            return jsonify({'success': False, 'error': 'File not found'}), 404
+        
+        file_data = result[0]
+        return send_file(
+            io.BytesIO(file_data['RESOURCE_FILE']),
+            mimetype=file_data['FILE_TYPE'],
+            as_attachment=False,
+            download_name=file_data['FILE_NAME']
+        )
+        
+    except Exception as e:
+        print(f"Error retrieving file: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @student_bp.context_processor
 def inject_announcements():

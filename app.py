@@ -4,6 +4,7 @@ from routes.auth import auth_bp
 from routes.student import student_bp
 from routes.staff import staff_bp
 from routes.sit_in import sit_in_bp
+from routes.reservation import reservation_bp
 from db import init_db
 import os
 from dotenv import load_dotenv
@@ -31,6 +32,7 @@ app.register_blueprint(admin_bp)
 app.register_blueprint(student_bp)
 app.register_blueprint(staff_bp)
 app.register_blueprint(sit_in_bp)
+app.register_blueprint(reservation_bp)
 
 # Initialize database
 init_db()

@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Make a Reservation</h4>
+                </div>
+                <div class="card-body">
+                    <form id="reservationForm" method="POST" action="{{ url_for('reservation.submit_reservation') }}">
+                        <div class="mb-3">
+                            <label for="lab" class="form-label">Laboratory</label>
+                            <select class="form-select" id="lab" name="lab_id" required>
+                                <option value="">Select Laboratory</option>
+                                {% for lab in labs %}
+                                <option value="{{ lab.LAB_ID }}">{{ lab.LAB_NAME }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="computer" class="form-label">Computer Number</label>
+                            <select class="form-select" id="computer" name="computer_id" required disabled>
+                                <option value="">Select Computer</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="purpose" class="form-label">Purpose</label>
+                            <select class="form-select" id="purpose" name="purpose_id" required>
+                                <option value="">Select Purpose</option>
+                                {% for purpose in purposes %}
+                                <option value="{{ purpose.PURPOSE_ID }}">{{ purpose.PURPOSE_NAME }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="date" class="form-label">Date</label>
+                            <input type="date" class="form-control" id="date" name="date" required>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="time_in" class="form-label">Time In</label>
+                                    <input type="time" class="form-control" id="time_in" name="time_in" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="time_out" class="form-label">Time Out</label>
+                                    <input type="time" class="form-control" id="time_out" name="time_out" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="program" class="form-label">Program</label>
+                            <input type="text" class="form-control" id="program" name="program" required>
+                        </div>
+
+                        <div class="text-end">
+                            <button type="submit" class="btn btn-primary">Submit Reservation</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const labSelect = document.getElementById('lab');
+    const computerSelect = document.getElementById('computer');
+    
+    // Update available computers when lab is selected
+    labSelect.addEventListener('change', function() {
+        const labId = this.value;
+        computerSelect.disabled = true; // Disable while loading
+        computerSelect.innerHTML = '<option value="">Loading computers...</option>';
+        
+        if (labId) {
+            fetch(`/api/computers/${labId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    
+                    computerSelect.innerHTML = '<option value="">Select Computer</option>';
+                    if (data.length === 0) {
+                        computerSelect.innerHTML = '<option value="">No available computers</option>';
+                    } else {
+                        data.forEach(computer => {
+                            const option = document.createElement('option');
+                            option.value = computer.COMPUTER_ID;
+                            option.textContent = `PC ${computer.COMPUTER_NUMBER}`;
+                            computerSelect.appendChild(option);
+                        });
+                        computerSelect.disabled = false;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    computerSelect.innerHTML = '<option value="">Error loading computers</option>';
+                });
+        } else {
+            computerSelect.innerHTML = '<option value="">Select Computer</option>';
+            computerSelect.disabled = true;
+        }
+    });
+
+    // Form submission
+    const form = document.getElementById('reservationForm');
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(form);
+        fetch(form.action, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                alert('Reservation submitted successfully!');
+                form.reset();
+                computerSelect.disabled = true;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred. Please try again.');
+        });
+    });
+});
+</script>
+{% endblock %} 

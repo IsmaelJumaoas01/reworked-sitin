@@ -60,6 +60,12 @@
                     </ul>
                 </li>
                 <li class="menu-item">
+                    <a href="{{ url_for('reservation.admin_reservations') }}" class="menu-link">
+                        <i class="fas fa-calendar-check"></i>
+                        <span>Reservations</span>
+                    </a>
+                </li>
+                <li class="menu-item">
                     <a href="{{ url_for('admin.manage_labs') }}" class="menu-link">
                         <i class="fas fa-laptop"></i>
                         <span>Manage Labs</span>
@@ -158,6 +164,18 @@
                     <a href="{{ url_for('sit_in.request_sit_in') }}" class="menu-link">
                         <i class="fas fa-plus"></i>
                         <span>Request Sit-In</span>
+                    </a>
+                </li>
+                <li class="menu-item">
+                    <a href="{{ url_for('reservation.student_reservation') }}" class="menu-link">
+                        <i class="fas fa-calendar-plus"></i>
+                        <span>Make Reservation</span>
+                    </a>
+                </li>
+                <li class="menu-item">
+                    <a href="{{ url_for('reservation.student_reservation_history') }}" class="menu-link">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>Reservation History</span>
                     </a>
                 </li>
                 <li class="menu-item">
@@ -431,6 +449,33 @@
     color: white;
     z-index: 1000;
     transition: all 0.3s ease;
+    overflow-y: auto; /* Enable vertical scrolling */
+}
+
+/* Custom Scrollbar Styles */
+.sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+    transition: all 0.3s ease;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+/* Firefox Scrollbar */
+.sidebar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.1);
 }
 
 .sidebar-header {
@@ -448,6 +493,13 @@
     list-style: none;
     padding: 0;
     margin: 0;
+    max-height: calc(100vh - 80px); /* Adjust based on header height */
+    overflow-y: auto;
+}
+
+/* Ensure the last menu item is visible */
+.sidebar-menu .menu-item:last-child {
+    margin-bottom: 1rem;
 }
 
 .menu-item {

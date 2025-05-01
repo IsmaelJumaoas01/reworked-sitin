@@ -339,6 +339,7 @@ def init_db():
                 TIME_OUT TIME,
                 STATUS ENUM('PENDING', 'APPROVED', 'DENIED', 'COMPLETED') DEFAULT 'PENDING',
                 SESSION ENUM('ON_GOING', 'COMPLETED') DEFAULT 'ON_GOING',
+                USE_POINTS BOOLEAN DEFAULT FALSE,
                 CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (USER_IDNO) REFERENCES USERS(IDNO),
                 FOREIGN KEY (LAB_ID) REFERENCES LABORATORIES(LAB_ID),
@@ -428,7 +429,10 @@ def init_db():
                 TITLE VARCHAR(255) NOT NULL,
                 CONTEXT TEXT,
                 RESOURCE_TYPE ENUM('file', 'link', 'text', 'image') NOT NULL,
-                RESOURCE_VALUE TEXT NOT NULL,
+                RESOURCE_VALUE TEXT,
+                RESOURCE_FILE MEDIUMBLOB,
+                FILE_NAME VARCHAR(255),
+                FILE_TYPE VARCHAR(100),
                 PURPOSE_ID INT NOT NULL,
                 ENABLED BOOLEAN DEFAULT TRUE,
                 CREATED_BY VARCHAR(20) NOT NULL,
@@ -561,6 +565,27 @@ def init_db():
                         # Break if we've reached max hours
                         if total_hours_scheduled >= max_hours_per_day:
                             break
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS RESERVATIONS (
+                RESERVATION_ID INT AUTO_INCREMENT PRIMARY KEY,
+                USER_IDNO VARCHAR(20) NOT NULL,
+                LAB_ID INT NOT NULL,
+                COMPUTER_ID INT NOT NULL,
+                PURPOSE_ID INT NOT NULL,
+                RESERVATION_DATE DATE NOT NULL,
+                TIME_IN TIME NOT NULL,
+                TIME_OUT TIME NOT NULL,
+                STATUS ENUM('PENDING', 'APPROVED', 'DENIED') DEFAULT 'PENDING',
+                PROGRAM VARCHAR(50) NOT NULL,
+                CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UPDATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (USER_IDNO) REFERENCES USERS(IDNO),
+                FOREIGN KEY (LAB_ID) REFERENCES LABORATORIES(LAB_ID),
+                FOREIGN KEY (COMPUTER_ID) REFERENCES COMPUTERS(COMPUTER_ID),
+                FOREIGN KEY (PURPOSE_ID) REFERENCES PURPOSES(PURPOSE_ID)
+            )
+        """)
         
         connection.commit()
         cursor.close()

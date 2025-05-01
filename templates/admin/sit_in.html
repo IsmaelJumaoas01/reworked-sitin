@@ -9,42 +9,44 @@
     <!-- Today's Sit-Ins -->
     <div class="card shadow mb-4">
         <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">Today's Sit-Ins</h6>
+            <h6 class="m-0 font-weight-bold text-primary">Today's Completed Sit-ins</h6>
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-bordered" id="todaySitInsTable" width="100%" cellspacing="0">
+                <table class="table table-bordered table-hover">
                     <thead>
                         <tr>
-                            <th>Student ID</th>
-                            <th>Name</th>
+                            <th>Student</th>
                             <th>Lab</th>
                             <th>Purpose</th>
-                            <th>Time In</th>
+                            <th>Start Time</th>
+                            <th>End Time</th>
+                            <th>Duration</th>
                             <th>Status</th>
-                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for sit_in in today_sit_ins %}
                         <tr>
-                            <td>{{ sit_in.USER_IDNO }}</td>
                             <td>{{ sit_in.FIRSTNAME }} {{ sit_in.LASTNAME }}</td>
                             <td>{{ sit_in.LAB_NAME }}</td>
                             <td>{{ sit_in.PURPOSE_NAME }}</td>
-                            <td>{{ sit_in.TIME_IN }}</td>
+                            <td>{{ sit_in.CREATED_AT.strftime('%I:%M %p') }}</td>
+                            <td>{{ sit_in.END_TIME.strftime('%I:%M %p') if sit_in.END_TIME else 'N/A' }}</td>
                             <td>
-                                <span class="badge bg-{{ 'success' if sit_in.SESSION == 'ON_GOING' else 'secondary' }}">
-                                    {{ sit_in.SESSION }}
-                                </span>
-                            </td>
-                            <td>
-                                {% if sit_in.SESSION == 'ON_GOING' %}
-                                <button class="btn btn-danger btn-sm end-sit-in" data-record-id="{{ sit_in.RECORD_ID }}">
-                                    <i class="fas fa-stop"></i> End
-                                </button>
+                                {% if sit_in.END_TIME %}
+                                    {{ ((sit_in.END_TIME - sit_in.CREATED_AT).total_seconds() / 60)|round|int }} minutes
+                                {% else %}
+                                    N/A
                                 {% endif %}
                             </td>
+                            <td>
+                                <span class="badge bg-success">Completed</span>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center">No completed sit-ins for today</td>
                         </tr>
                         {% endfor %}
                     </tbody>

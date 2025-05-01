@@ -129,21 +129,20 @@
                             </select>
                         </div>
                     </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label d-block">Status</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="enabled" name="enabled" checked>
+                                <label class="form-check-label" for="enabled">Enabled</label>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="mb-3">
                     <label for="context" class="form-label">Description</label>
                     <textarea class="form-control" id="context" name="context" rows="3" required></textarea>
-                </div>
-
-                <div class="mb-3">
-                    <label for="courses" class="form-label">Available Courses</label>
-                    <select class="form-select" id="courses" name="courses[]" multiple required>
-                        <option value="BSIT">BSIT</option>
-                        <option value="BSCS">BSCS</option>
-                        <option value="BSCE">BSCE</option>
-                        <option value="BSEE">BSEE</option>
-                    </select>
                 </div>
 
                 <!-- Resource Value Section -->
@@ -260,6 +259,55 @@
         {% endfor %}
     </div>
 </div>
+
+<div class="modal fade" id="addResourceModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Resource</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addResourceForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label">Title</label>
+                        <input type="text" class="form-control" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Context</label>
+                        <textarea class="form-control" name="context" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Resource Type</label>
+                        <select class="form-select" name="resource_type" id="resourceType" required>
+                            <option value="">Select type...</option>
+                            <option value="text">Text</option>
+                            <option value="link">Link</option>
+                            <option value="file">File</option>
+                            <option value="image">Image</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Purpose</label>
+                        <select class="form-select" name="purpose_id" required>
+                            <option value="">Select purpose...</option>
+                            {% for purpose in purposes %}
+                            <option value="{{ purpose.PURPOSE_ID }}">{{ purpose.PURPOSE_NAME }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div id="resourceValueContainer">
+                        <!-- Dynamic content based on resource type -->
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitResource()">Add Resource</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block styles %}
@@ -332,6 +380,7 @@
 function showAddForm() {
     document.getElementById('resourceFormSection').style.display = 'block';
     document.getElementById('formTitle').textContent = 'Add New Resource';
+    document.getElementById('resource_id').value = ''; // Clear resource ID
     resetForm();
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -360,7 +409,19 @@ function toggleResourceSection() {
     });
     
     if (resourceType) {
-        document.getElementById(`${resourceType}_section`).style.display = 'block';
+        const section = document.getElementById(`${resourceType}_section`);
+        if (section) {
+            section.style.display = 'block';
+            
+            // Reset file inputs when switching types
+            if (resourceType === 'file') {
+                document.getElementById('file').value = '';
+                document.getElementById('filePreview').style.display = 'none';
+            } else if (resourceType === 'image') {
+                document.getElementById('image').value = '';
+                document.getElementById('imagePreview').style.display = 'none';
+            }
+        }
     }
 }
 
@@ -394,30 +455,57 @@ document.getElementById('image').addEventListener('change', function(e) {
 });
 
 // Form Submission
-document.getElementById('resourceForm').addEventListener('submit', function(e) {
+document.getElementById('resourceForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
     const formData = new FormData(this);
     const resourceId = document.getElementById('resource_id').value;
-    const url = resourceId ? '/admin/resources/edit' : '/admin/resources';
+    const resourceType = formData.get('resource_type');
     
-    fetch(url, {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert(data.message);
+    // Validate required fields
+    const title = formData.get('title');
+    const purposeId = formData.get('purpose_id');
+    
+    if (!title || !resourceType || !purposeId) {
+        alert('Please fill in all required fields');
+        return;
+    }
+    
+    // Validate file upload for new resources
+    if (!resourceId && (resourceType === 'file' || resourceType === 'image')) {
+        const fileInput = document.getElementById(resourceType === 'file' ? 'file' : 'image');
+        if (!fileInput.files.length) {
+            alert('Please select a file');
+            return;
+        }
+        
+        // Add the file to formData with the correct name
+        const file = fileInput.files[0];
+        formData.set('file', file);
+    }
+    
+    try {
+        const endpoint = resourceId ? 
+            `/admin/resources/${resourceId}/edit` : 
+            '/admin/resources/upload';
+            
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(resourceId ? 'Resource updated successfully' : 'Resource added successfully');
             window.location.reload();
         } else {
-            alert(data.error || 'An error occurred');
+            alert(result.error || 'An error occurred');
         }
-    })
-    .catch(error => {
+    } catch (error) {
         console.error('Error:', error);
         alert('An error occurred while saving the resource');
-    });
+    }
 });
 
 // CRUD Operations
@@ -438,13 +526,13 @@ function viewResource(resourceId) {
                         <p class="text-muted">${data.context}</p>
                         <div class="resource-content mb-4">
                             ${data.resource_type === 'file' ? 
-                                `<a href="${data.resource_value}" class="btn btn-primary" target="_blank">Download File</a>` :
+                                `<a href="/admin/resources/${resourceId}/file" class="btn btn-primary" target="_blank">Download File</a>` :
                             data.resource_type === 'link' ? 
                                 `<a href="${data.resource_value}" class="btn btn-primary" target="_blank">Open Link</a>` :
                             data.resource_type === 'text' ? 
                                 `<div class="p-3 bg-light">${data.resource_value}</div>` :
                             data.resource_type === 'image' ? 
-                                `<img src="${data.resource_value}" class="img-fluid" alt="${data.title}">` :
+                                `<img src="/admin/resources/${resourceId}/file" class="img-fluid" alt="${data.title}">` :
                                 ''}
                         </div>
                         <div class="resource-details">
@@ -465,56 +553,86 @@ function viewResource(resourceId) {
 }
 
 function editResource(resourceId) {
+    if (!resourceId) {
+        alert('Invalid resource ID');
+        return;
+    }
+    
     fetch(`/admin/resources/${resourceId}`)
         .then(response => response.json())
         .then(data => {
-            document.getElementById('edit_resource_id').value = data.resource_id;
-            document.getElementById('edit_title').value = data.title;
-            document.getElementById('edit_context').value = data.context;
-            document.getElementById('edit_resource_type').value = data.resource_type;
-            document.getElementById('edit_purpose_id').value = data.purpose_id;
-            document.getElementById('edit_enabled').checked = data.enabled;
+            // Show the form section
+            const formSection = document.getElementById('resourceFormSection');
+            const formTitle = document.getElementById('formTitle');
+            if (formSection) formSection.style.display = 'block';
+            if (formTitle) formTitle.textContent = 'Edit Resource';
             
-            // Update resource value container based on type
-            const container = document.getElementById('edit_resource_value_container');
-            container.innerHTML = '';
+            // Set form values
+            const formElements = {
+                'resource_id': resourceId,
+                'title': data.title,
+                'context': data.context,
+                'resource_type': data.resource_type,
+                'purpose_id': data.purpose_id,
+                'enabled': data.enabled
+            };
             
+            // Set values for each form element if it exists
+            Object.entries(formElements).forEach(([id, value]) => {
+                const element = document.getElementById(id);
+                if (element) {
+                    if (element.type === 'checkbox') {
+                        element.checked = value;
+                    } else {
+                        element.value = value;
+                    }
+                }
+            });
+            
+            // Show the appropriate resource section
+            toggleResourceSection();
+            
+            // Set the resource value based on type
             switch(data.resource_type) {
                 case 'file':
-                    container.innerHTML = `
-                        <label class="form-label">Current File</label>
-                        <div class="mb-2">
-                            <a href="${data.resource_value}" target="_blank">View Current File</a>
-                        </div>
-                        <label for="edit_file" class="form-label">Upload New File</label>
-                        <input type="file" class="form-control" id="edit_file" name="file">
-                    `;
+                    const filePreview = document.getElementById('filePreview');
+                    if (filePreview) {
+                        filePreview.style.display = 'block';
+                        filePreview.innerHTML = `
+                            <div class="file-info">
+                                <i class="fas fa-file me-2"></i>
+                                <span>Current File: ${data.file_name || 'Unknown'}</span>
+                                <a href="/admin/resources/${resourceId}/file" target="_blank" class="ms-2">View Current File</a>
+                            </div>
+                        `;
+                    }
                     break;
                 case 'link':
-                    container.innerHTML = `
-                        <label for="edit_resource_value" class="form-label">Resource Link</label>
-                        <input type="url" class="form-control" id="edit_resource_value" name="resource_value" value="${data.resource_value}" required>
-                    `;
+                    const linkValue = document.getElementById('link_value');
+                    if (linkValue) linkValue.value = data.resource_value;
                     break;
                 case 'text':
-                    container.innerHTML = `
-                        <label for="edit_resource_value" class="form-label">Resource Text</label>
-                        <textarea class="form-control" id="edit_resource_value" name="resource_value" rows="5" required>${data.resource_value}</textarea>
-                    `;
+                    const textValue = document.getElementById('text_value');
+                    if (textValue) textValue.value = data.resource_value;
                     break;
                 case 'image':
-                    container.innerHTML = `
-                        <label class="form-label">Current Image</label>
-                        <div class="mb-2">
-                            <img src="${data.resource_value}" class="img-fluid" style="max-height: 200px;">
-                        </div>
-                        <label for="edit_file" class="form-label">Upload New Image</label>
-                        <input type="file" class="form-control" id="edit_file" name="file" accept="image/*">
-                    `;
+                    const imagePreview = document.getElementById('imagePreview');
+                    if (imagePreview) {
+                        imagePreview.style.display = 'block';
+                        imagePreview.innerHTML = `
+                            <div class="current-image">
+                                <img src="/admin/resources/${resourceId}/file" class="img-fluid" style="max-height: 200px;">
+                                <div class="mt-2">
+                                    <a href="/admin/resources/${resourceId}/file" target="_blank">View Current Image</a>
+                                </div>
+                            </div>
+                        `;
+                    }
                     break;
             }
             
-            $('#editResourceModal').modal('show');
+            // Scroll to the form
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         })
         .catch(error => {
             console.error('Error:', error);
@@ -541,6 +659,141 @@ function deleteResource(resourceId) {
             alert('An error occurred while deleting the resource');
         });
     }
+}
+
+function updateResourceValueInput() {
+    const resourceType = document.getElementById('resourceType').value;
+    const container = document.getElementById('resourceValueContainer');
+    
+    switch(resourceType) {
+        case 'text':
+            container.innerHTML = `
+                <div class="mb-3">
+                    <label class="form-label">Text Content</label>
+                    <textarea class="form-control" name="resource_value" rows="4" required></textarea>
+                </div>
+            `;
+            break;
+        case 'link':
+            container.innerHTML = `
+                <div class="mb-3">
+                    <label class="form-label">URL</label>
+                    <input type="url" class="form-control" name="resource_value" required>
+                </div>
+            `;
+            break;
+        case 'file':
+            container.innerHTML = `
+                <div class="mb-3">
+                    <label class="form-label">Upload File</label>
+                    <input type="file" class="form-control" name="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx" required>
+                    <small class="text-muted">Maximum file size: 10MB</small>
+                </div>
+            `;
+            break;
+        case 'image':
+            container.innerHTML = `
+                <div class="mb-3">
+                    <label class="form-label">Upload Image</label>
+                    <input type="file" class="form-control" name="file" accept="image/*" required>
+                    <small class="text-muted">Supported formats: JPG, PNG, GIF</small>
+                </div>
+            `;
+            break;
+        default:
+            container.innerHTML = '';
+    }
+}
+
+document.getElementById('resourceType').addEventListener('change', updateResourceValueInput);
+
+function submitResource() {
+    const form = document.getElementById('addResourceForm');
+    const formData = new FormData(form);
+    const resourceType = document.getElementById('resourceType').value;
+    
+    // Validate based on resource type
+    if (resourceType === 'file' || resourceType === 'image') {
+        const fileInput = form.querySelector('input[type="file"]');
+        if (!fileInput.files.length) {
+            showAlert('danger', 'Please select a file to upload');
+            return;
+        }
+    } else {
+        const resourceValue = form.querySelector('[name="resource_value"]');
+        if (!resourceValue || !resourceValue.value.trim()) {
+            showAlert('danger', 'Resource value is required');
+            return;
+        }
+    }
+    
+    fetch('/admin/resources/upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Close modal and refresh resources
+            bootstrap.Modal.getInstance(document.getElementById('addResourceModal')).hide();
+            loadResources();
+            // Show success message
+            showAlert('success', 'Resource added successfully!');
+        } else {
+            showAlert('danger', data.error || 'Error adding resource');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('danger', 'Error adding resource');
+    });
+}
+
+// Function to display resources in the table
+function displayResources(resources) {
+    const tbody = document.querySelector('#resourcesTable tbody');
+    tbody.innerHTML = '';
+    
+    resources.forEach(resource => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${resource.TITLE}</td>
+            <td>${resource.CONTEXT || '-'}</td>
+            <td>${resource.RESOURCE_TYPE}</td>
+            <td>
+                ${resource.RESOURCE_TYPE === 'file' || resource.RESOURCE_TYPE === 'image' ? 
+                    `<div class="btn-group">
+                        <a href="/admin/resources/${resource.RESOURCE_ID}/file" class="btn btn-sm btn-primary">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                        ${resource.RESOURCE_TYPE === 'image' ? 
+                            `<a href="/admin/resources/${resource.RESOURCE_ID}/view" class="btn btn-sm btn-info" target="_blank">
+                                <i class="fas fa-eye"></i> View
+                            </a>` : ''}
+                    </div>` :
+                    resource.RESOURCE_TYPE === 'link' ?
+                    `<a href="${resource.RESOURCE_VALUE}" target="_blank" class="btn btn-sm btn-primary">
+                        <i class="fas fa-external-link-alt"></i> Open Link
+                    </a>` :
+                    `<div class="text-content">${resource.RESOURCE_VALUE}</div>`
+                }
+            </td>
+            <td>${resource.PURPOSE_NAME}</td>
+            <td>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" 
+                           ${resource.ENABLED ? 'checked' : ''}
+                           onchange="toggleResource(${resource.RESOURCE_ID}, this.checked)">
+                </div>
+            </td>
+            <td>
+                <button class="btn btn-sm btn-danger" onclick="deleteResource(${resource.RESOURCE_ID})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
 }
 </script>
 

@@ -15,6 +15,8 @@ import xlsxwriter
 from werkzeug.utils import secure_filename
 import re
 import traceback
+import base64
+import io
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -990,7 +992,7 @@ def manage_lab(lab_id):
 @role_required('ADMIN')
 def sit_in_management():
     try:
-        # Get today's sit-ins
+        # Get today's completed sit-ins
         today_query = """
         SELECT 
             sr.*,
@@ -1003,6 +1005,7 @@ def sit_in_management():
         JOIN LABORATORIES l ON sr.LAB_ID = l.LAB_ID
         JOIN PURPOSES p ON sr.PURPOSE_ID = p.PURPOSE_ID
         WHERE DATE(sr.CREATED_AT) = CURDATE()
+        AND sr.SESSION = 'COMPLETED'
         ORDER BY sr.CREATED_AT DESC
         """
         today_sit_ins = execute_query(today_query)
@@ -1134,10 +1137,11 @@ def start_sit_in():
             COMPUTER_ID, 
             TIME_IN, 
             SESSION, 
-            STATUS
-        ) VALUES (%s, %s, %s, %s, %s, 'ON_GOING', 'APPROVED')
+            STATUS,
+            USE_POINTS
+        ) VALUES (%s, %s, %s, %s, %s, 'ON_GOING', 'APPROVED', %s)
         """
-        execute_query(insert_query, (student_idno, lab_id, purpose_id, computer_id, current_time))
+        execute_query(insert_query, (student_idno, lab_id, purpose_id, computer_id, current_time, use_points))
         
         # Update computer status
         update_computer_query = """
@@ -1147,7 +1151,7 @@ def start_sit_in():
         """
         execute_query(update_computer_query, (computer_id,))
         
-        # Update points or sit-in count based on method
+        # If using points, deduct them immediately
         if use_points:
             # Deduct 3 points
             points_query = """
@@ -1163,14 +1167,6 @@ def start_sit_in():
             VALUES (%s, -3, 'Points used for sit-in session', %s)
             """
             execute_query(history_query, (student_idno, session['user_id']))
-        else:
-            # Update sit-in count
-            update_count_query = """
-            UPDATE SIT_IN_LIMITS
-            SET SIT_IN_COUNT = SIT_IN_COUNT + 1
-            WHERE USER_IDNO = %s
-            """
-            execute_query(update_count_query, (student_idno,))
         
         return jsonify({'success': True})
     except Exception as e:
@@ -1183,7 +1179,7 @@ def end_sit_in(record_id):
     try:
         # Get the sit-in record
         record_query = """
-        SELECT USER_IDNO, SESSION, COMPUTER_ID
+        SELECT USER_IDNO, SESSION, COMPUTER_ID, USE_POINTS
         FROM SIT_IN_RECORDS
         WHERE RECORD_ID = %s
         """
@@ -1205,13 +1201,35 @@ def end_sit_in(record_id):
         """
         execute_query(update_query, (record_id,))
         
-        # Update sit-in count for the student
-        update_count_query = """
-        UPDATE SIT_IN_LIMITS
-        SET SIT_IN_COUNT = SIT_IN_COUNT + 1
-        WHERE USER_IDNO = %s
-        """
-        execute_query(update_count_query, (record[0]['USER_IDNO']))
+        # If not using points, update sit-in count for the student
+        if not record[0]['USE_POINTS']:
+            # Get current sit-in count and max limit
+            limits_query = """
+            SELECT SIT_IN_COUNT, MAX_SIT_INS
+            FROM SIT_IN_LIMITS
+            WHERE USER_IDNO = %s
+            """
+            limits_result = execute_query(limits_query, (record[0]['USER_IDNO'],))
+            
+            if not limits_result:
+                # Create initial record if it doesn't exist
+                insert_limits_query = """
+                INSERT INTO SIT_IN_LIMITS (USER_IDNO, SIT_IN_COUNT, MAX_SIT_INS)
+                VALUES (%s, 1, 30)
+                """
+                execute_query(insert_limits_query, (record[0]['USER_IDNO'],))
+            else:
+                # Update existing record by increasing the count
+                current_count = limits_result[0]['SIT_IN_COUNT']
+                max_limit = limits_result[0]['MAX_SIT_INS']
+                
+                if current_count < max_limit:
+                    update_count_query = """
+                    UPDATE SIT_IN_LIMITS
+                    SET SIT_IN_COUNT = SIT_IN_COUNT + 1
+                    WHERE USER_IDNO = %s
+                    """
+                    execute_query(update_count_query, (record[0]['USER_IDNO'],))
         
         # Check if student has a record in STUDENT_POINTS
         check_points_query = """
@@ -1255,6 +1273,7 @@ def end_sit_in(record_id):
         
         return jsonify({'success': True, 'message': 'Sit-in session ended successfully'})
     except Exception as e:
+        print(f"Error in end_sit_in: {str(e)}")  # Add error logging
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @admin_bp.route('/sit-in-records')
@@ -2096,9 +2115,14 @@ def add_resource():
             if file.filename == '':
                 return jsonify({'error': 'No file selected'}), 400
             
+            # Create resources directory if it doesn't exist
+            resources_dir = os.path.join('static', 'resources')
+            if not os.path.exists(resources_dir):
+                os.makedirs(resources_dir)
+            
             # Save file and get path
             filename = secure_filename(file.filename)
-            file_path = os.path.join('static', 'resources', filename)
+            file_path = os.path.join(resources_dir, filename)
             file.save(file_path)
             resource_value = file_path
         else:
@@ -2114,64 +2138,6 @@ def add_resource():
         resource_id = execute_query(query, (title, context, resource_type, resource_value, purpose_id, session['user_id']))
         
         return jsonify({'success': True, 'message': 'Resource added successfully'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@admin_bp.route('/resources/edit', methods=['POST'])
-@login_required
-@role_required('ADMIN')
-def edit_resource():
-    try:
-        resource_id = request.form.get('resource_id')
-        title = request.form.get('title')
-        context = request.form.get('context')
-        resource_type = request.form.get('resource_type')
-        purpose_id = request.form.get('purpose_id')
-        enabled = request.form.get('enabled') == '1'
-        
-        if not resource_id or not title or not resource_type or not purpose_id:
-            return jsonify({'error': 'Missing required fields'}), 400
-        
-        # Get current resource
-        current_query = "SELECT * FROM LAB_RESOURCES WHERE RESOURCE_ID = %s"
-        current_resource = execute_query(current_query, (resource_id,))
-        
-        if not current_resource:
-            return jsonify({'error': 'Resource not found'}), 404
-        
-        current_resource = current_resource[0]
-        
-        # Handle file upload
-        if resource_type == 'file' and 'file' in request.files:
-            file = request.files['file']
-            if file.filename != '':
-                # Delete old file if exists
-                if current_resource['RESOURCE_TYPE'] == 'file':
-                    old_file_path = current_resource['RESOURCE_VALUE']
-                    if os.path.exists(old_file_path):
-                        os.remove(old_file_path)
-                
-                # Save new file
-                filename = secure_filename(file.filename)
-                file_path = os.path.join('static', 'resources', filename)
-                file.save(file_path)
-                resource_value = file_path
-            else:
-                resource_value = current_resource['RESOURCE_VALUE']
-        else:
-            resource_value = request.form.get('resource_value')
-            if not resource_value:
-                return jsonify({'error': 'Resource value is required'}), 400
-        
-        # Update resource
-        query = """
-        UPDATE LAB_RESOURCES 
-        SET TITLE = %s, CONTEXT = %s, RESOURCE_TYPE = %s, RESOURCE_VALUE = %s, PURPOSE_ID = %s, ENABLED = %s
-        WHERE RESOURCE_ID = %s
-        """
-        execute_query(query, (title, context, resource_type, resource_value, purpose_id, enabled, resource_id))
-        
-        return jsonify({'success': True, 'message': 'Resource updated successfully'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -2922,7 +2888,9 @@ def get_lab_info(lab_id):
         SELECT 
             l.*,
             COUNT(c.COMPUTER_ID) as total_computers,
-            SUM(CASE WHEN c.STATUS = 'available' THEN 1 ELSE 0 END) as available_computers
+            SUM(CASE WHEN c.STATUS = 'available' THEN 1 ELSE 0 END) as available_computers,
+            SUM(CASE WHEN c.STATUS = 'in_use' THEN 1 ELSE 0 END) as in_use_computers,
+            SUM(CASE WHEN c.STATUS = 'maintenance' THEN 1 ELSE 0 END) as maintenance_computers
         FROM LABORATORIES l
         LEFT JOIN COMPUTERS c ON l.LAB_ID = c.LAB_ID
         WHERE l.LAB_ID = %s
@@ -2937,6 +2905,8 @@ def get_lab_info(lab_id):
         lab_data = lab[0]
         lab_data['total_computers'] = int(lab_data['total_computers'])
         lab_data['available_computers'] = int(lab_data['available_computers'])
+        lab_data['in_use_computers'] = int(lab_data['in_use_computers'])
+        lab_data['maintenance_computers'] = int(lab_data['maintenance_computers'])
         
         return jsonify(lab_data)
     except Exception as e:
@@ -3012,4 +2982,192 @@ def disable_all_computers(lab_id):
         
         return jsonify({'success': True, 'message': 'All computers disabled successfully'})
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/resources/upload', methods=['POST'])
+@login_required
+def upload_resource():
+    if request.method == 'POST':
+        try:
+            title = request.form.get('title')
+            context = request.form.get('context')
+            resource_type = request.form.get('resource_type')
+            purpose_id = request.form.get('purpose_id')
+            
+            if not all([title, resource_type, purpose_id]):
+                return jsonify({'success': False, 'error': 'Missing required fields'})
+            
+            # Handle different resource types
+            if resource_type in ['file', 'image']:
+                if 'file' not in request.files:
+                    return jsonify({'success': False, 'error': 'No file uploaded'})
+                
+                file = request.files['file']
+                if file.filename == '':
+                    return jsonify({'success': False, 'error': 'No file selected'})
+                
+                # Read file content
+                file_content = file.read()
+                file_name = secure_filename(file.filename)
+                file_type = file.content_type
+                
+                # Insert into database with file content
+                query = """
+                    INSERT INTO LAB_RESOURCES 
+                    (TITLE, CONTEXT, RESOURCE_TYPE, RESOURCE_FILE, FILE_NAME, FILE_TYPE, PURPOSE_ID, CREATED_BY)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                execute_query(query, (
+                    title, context, resource_type, file_content, 
+                    file_name, file_type, purpose_id, session['user_id']
+                ))
+                
+            else:  # For text and link types
+                resource_value = request.form.get('resource_value')
+                if not resource_value:
+                    return jsonify({'success': False, 'error': 'Resource value is required'})
+                
+                query = """
+                    INSERT INTO LAB_RESOURCES 
+                    (TITLE, CONTEXT, RESOURCE_TYPE, RESOURCE_VALUE, PURPOSE_ID, CREATED_BY)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """
+                execute_query(query, (
+                    title, context, resource_type, resource_value, 
+                    purpose_id, session['user_id']
+                ))
+            
+            return jsonify({'success': True})
+            
+        except Exception as e:
+            print(f"Error uploading resource: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)})
+
+@admin_bp.route('/resources/<int:resource_id>/file')
+@login_required
+def get_resource_file(resource_id):
+    try:
+        query = """
+            SELECT RESOURCE_FILE, FILE_NAME, FILE_TYPE 
+            FROM LAB_RESOURCES 
+            WHERE RESOURCE_ID = %s AND RESOURCE_TYPE IN ('file', 'image')
+        """
+        result = execute_query(query, (resource_id,))
+        
+        if not result or not result[0]['RESOURCE_FILE']:
+            return jsonify({'success': False, 'error': 'File not found'}), 404
+        
+        file_data = result[0]
+        return send_file(
+            io.BytesIO(file_data['RESOURCE_FILE']),
+            mimetype=file_data['FILE_TYPE'],
+            as_attachment=True,
+            download_name=file_data['FILE_NAME']
+        )
+        
+    except Exception as e:
+        print(f"Error retrieving file: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/resources/<int:resource_id>/view')
+@login_required
+def view_resource_file(resource_id):
+    try:
+        query = """
+            SELECT RESOURCE_FILE, FILE_NAME, FILE_TYPE 
+            FROM LAB_RESOURCES 
+            WHERE RESOURCE_ID = %s AND RESOURCE_TYPE IN ('file', 'image')
+        """
+        result = execute_query(query, (resource_id,))
+        
+        if not result or not result[0]['RESOURCE_FILE']:
+            return jsonify({'success': False, 'error': 'File not found'}), 404
+        
+        file_data = result[0]
+        return send_file(
+            io.BytesIO(file_data['RESOURCE_FILE']),
+            mimetype=file_data['FILE_TYPE'],
+            as_attachment=False,
+            download_name=file_data['FILE_NAME']
+        )
+        
+    except Exception as e:
+        print(f"Error retrieving file: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@admin_bp.route('/resources/<int:resource_id>/edit', methods=['POST'])
+@login_required
+@role_required('ADMIN')
+def update_resource(resource_id):
+    try:
+        title = request.form.get('title')
+        context = request.form.get('context')
+        resource_type = request.form.get('resource_type')
+        purpose_id = request.form.get('purpose_id')
+        enabled = request.form.get('enabled') == 'on'
+        
+        if not title or not resource_type or not purpose_id:
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        # Get current resource
+        current_query = "SELECT * FROM LAB_RESOURCES WHERE RESOURCE_ID = %s"
+        current_resource = execute_query(current_query, (resource_id,))
+        
+        if not current_resource:
+            return jsonify({'error': 'Resource not found'}), 404
+        
+        current_resource = current_resource[0]
+        
+        # Handle file upload
+        if resource_type in ['file', 'image'] and 'file' in request.files:
+            file = request.files['file']
+            if file.filename != '':
+                # Read new file content
+                file_content = file.read()
+                file_name = secure_filename(file.filename)
+                file_type = file.content_type
+                
+                # Update with new file
+                query = """
+                UPDATE LAB_RESOURCES 
+                SET TITLE = %s, CONTEXT = %s, RESOURCE_TYPE = %s, 
+                    RESOURCE_FILE = %s, FILE_NAME = %s, FILE_TYPE = %s,
+                    PURPOSE_ID = %s, ENABLED = %s
+                WHERE RESOURCE_ID = %s
+                """
+                execute_query(query, (
+                    title, context, resource_type, file_content,
+                    file_name, file_type, purpose_id, enabled, resource_id
+                ))
+            else:
+                # Keep existing file
+                query = """
+                UPDATE LAB_RESOURCES 
+                SET TITLE = %s, CONTEXT = %s, RESOURCE_TYPE = %s,
+                    PURPOSE_ID = %s, ENABLED = %s
+                WHERE RESOURCE_ID = %s
+                """
+                execute_query(query, (
+                    title, context, resource_type, purpose_id, enabled, resource_id
+                ))
+        else:
+            # For non-file resources
+            resource_value = request.form.get('resource_value')
+            if not resource_value:
+                return jsonify({'error': 'Resource value is required'}), 400
+            
+            query = """
+            UPDATE LAB_RESOURCES 
+            SET TITLE = %s, CONTEXT = %s, RESOURCE_TYPE = %s,
+                RESOURCE_VALUE = %s, PURPOSE_ID = %s, ENABLED = %s
+            WHERE RESOURCE_ID = %s
+            """
+            execute_query(query, (
+                title, context, resource_type, resource_value,
+                purpose_id, enabled, resource_id
+            ))
+        
+        return jsonify({'success': True, 'message': 'Resource updated successfully'})
+    except Exception as e:
+        print(f"Error updating resource: {str(e)}")
         return jsonify({'error': str(e)}), 500
