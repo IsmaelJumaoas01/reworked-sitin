@@ -313,7 +313,7 @@ def init_db():
                 COMPUTER_NUMBER INT NOT NULL,
                 STATUS ENUM('available', 'in_use', 'maintenance') DEFAULT 'available',
                 CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (LAB_ID) REFERENCES LABORATORIES(LAB_ID),
+                FOREIGN KEY (LAB_ID) REFERENCES LABORATORIES(LAB_ID) ON DELETE CASCADE,
                 UNIQUE KEY unique_computer (LAB_ID, COMPUTER_NUMBER)
             )
         """)
@@ -324,6 +324,35 @@ def init_db():
                 PURPOSE_NAME VARCHAR(100) NOT NULL,
                 STATUS ENUM('active', 'inactive') DEFAULT 'active',
                 CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS PROFESSORS (
+                PROFESSOR_ID INT AUTO_INCREMENT PRIMARY KEY,
+                FIRST_NAME VARCHAR(50) NOT NULL,
+                LAST_NAME VARCHAR(50) NOT NULL,
+                MIDDLE_NAME VARCHAR(50),
+                STATUS ENUM('active', 'inactive') DEFAULT 'active',
+                CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UPDATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            )
+        """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS LAB_SCHEDULES (
+                SCHEDULE_ID INT AUTO_INCREMENT PRIMARY KEY,
+                LAB_ID INT NOT NULL,
+                PURPOSE_ID INT NOT NULL,
+                PROFESSOR_ID INT NOT NULL,
+                DAY_OF_WEEK ENUM('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday') NOT NULL,
+                START_TIME TIME NOT NULL,
+                END_TIME TIME NOT NULL,
+                STATUS ENUM('active', 'inactive') DEFAULT 'active',
+                CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (LAB_ID) REFERENCES LABORATORIES(LAB_ID) ON DELETE CASCADE,
+                FOREIGN KEY (PURPOSE_ID) REFERENCES PURPOSES(PURPOSE_ID) ON DELETE CASCADE,
+                FOREIGN KEY (PROFESSOR_ID) REFERENCES PROFESSORS(PROFESSOR_ID) ON DELETE CASCADE
             )
         """)
         
@@ -341,10 +370,10 @@ def init_db():
                 SESSION ENUM('ON_GOING', 'COMPLETED') DEFAULT 'ON_GOING',
                 USE_POINTS BOOLEAN DEFAULT FALSE,
                 CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (USER_IDNO) REFERENCES USERS(IDNO),
-                FOREIGN KEY (LAB_ID) REFERENCES LABORATORIES(LAB_ID),
-                FOREIGN KEY (COMPUTER_ID) REFERENCES COMPUTERS(COMPUTER_ID),
-                FOREIGN KEY (PURPOSE_ID) REFERENCES PURPOSES(PURPOSE_ID)
+                FOREIGN KEY (USER_IDNO) REFERENCES USERS(IDNO) ON DELETE CASCADE,
+                FOREIGN KEY (LAB_ID) REFERENCES LABORATORIES(LAB_ID) ON DELETE CASCADE,
+                FOREIGN KEY (COMPUTER_ID) REFERENCES COMPUTERS(COMPUTER_ID) ON DELETE CASCADE,
+                FOREIGN KEY (PURPOSE_ID) REFERENCES PURPOSES(PURPOSE_ID) ON DELETE CASCADE
             )
         """)
         
@@ -446,34 +475,21 @@ def init_db():
         # Remove the lab_resource_courses table since we're not using it anymore
         cursor.execute("DROP TABLE IF EXISTS LAB_RESOURCE_COURSES")
         
-        # Create lab schedules table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS LAB_SCHEDULES (
-                SCHEDULE_ID INT AUTO_INCREMENT PRIMARY KEY,
-                LAB_ID INT NOT NULL,
-                PURPOSE_ID INT NOT NULL,
-                DAY_OF_WEEK ENUM('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday') NOT NULL,
-                START_TIME TIME NOT NULL,
-                END_TIME TIME NOT NULL,
-                STATUS ENUM('active', 'inactive') DEFAULT 'active',
-                CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (LAB_ID) REFERENCES LABORATORIES(LAB_ID),
-                FOREIGN KEY (PURPOSE_ID) REFERENCES PURPOSES(PURPOSE_ID) ON DELETE CASCADE
-            )
-        """)
-        
         # Insert default data
         insert_default_data()
         
         # Initialize lab schedules if none exist
         cursor.execute("SELECT COUNT(*) as count FROM LAB_SCHEDULES")
         if cursor.fetchone()['count'] == 0:
-            # Get all active labs and purposes
+            # Get all active labs, purposes, and professors
             cursor.execute("SELECT LAB_ID FROM LABORATORIES WHERE STATUS = 'active'")
             labs = cursor.fetchall()
             
             cursor.execute("SELECT PURPOSE_ID FROM PURPOSES WHERE STATUS = 'active'")
             purposes = cursor.fetchall()
+
+            cursor.execute("SELECT PROFESSOR_ID FROM PROFESSORS WHERE STATUS = 'active'")
+            professors = cursor.fetchall()
             
             # Define time slots with random intervals
             time_slots = [
@@ -552,13 +568,17 @@ def init_db():
                         available_purposes = purposes.copy()
                         random.shuffle(available_purposes)
                         
-                        # Add schedule for this time slot - only one purpose per slot
-                        if available_purposes:
+                        # Randomly select professor for this slot
+                        available_professors = professors.copy()
+                        random.shuffle(available_professors)
+                        
+                        # Add schedule for this time slot - only one purpose and one professor per slot
+                        if available_purposes and available_professors:
                             cursor.execute("""
                                 INSERT INTO LAB_SCHEDULES 
-                                (LAB_ID, PURPOSE_ID, DAY_OF_WEEK, START_TIME, END_TIME, STATUS)
-                                VALUES (%s, %s, %s, %s, %s, 'active')
-                            """, (lab['LAB_ID'], available_purposes[0]['PURPOSE_ID'], day, start_time, end_time))
+                                (LAB_ID, PURPOSE_ID, PROFESSOR_ID, DAY_OF_WEEK, START_TIME, END_TIME, STATUS)
+                                VALUES (%s, %s, %s, %s, %s, %s, 'active')
+                            """, (lab['LAB_ID'], available_purposes[0]['PURPOSE_ID'], available_professors[0]['PROFESSOR_ID'], day, start_time, end_time))
                         
                         total_hours_scheduled += duration
                         
@@ -586,6 +606,42 @@ def init_db():
                 FOREIGN KEY (PURPOSE_ID) REFERENCES PURPOSES(PURPOSE_ID)
             )
         """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS PROFESSORS (
+                PROFESSOR_ID INT AUTO_INCREMENT PRIMARY KEY,
+                FIRST_NAME VARCHAR(50) NOT NULL,
+                LAST_NAME VARCHAR(50) NOT NULL,
+                MIDDLE_NAME VARCHAR(50),
+                STATUS ENUM('active', 'inactive') DEFAULT 'active',
+                CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UPDATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Insert default professors
+        cursor.execute("SELECT COUNT(*) as count FROM PROFESSORS")
+        if cursor.fetchone()['count'] == 0:
+            print("\nInserting default professors...")
+            default_professors = [
+                ('NONITO', 'ODJINAR', 'O.'),
+                ('WILSON', 'GAYO', ''),
+                ('JEFF', 'SALIMBANGON', ''),
+                ('DENNIS', 'DURANO', 'S.'),
+                ('LEO', 'BERMUDEZ', 'C.'),
+                ('JENNIFER', 'AMORES', 'G.'),
+                ('JIA NOVA', 'MONTECINO', 'B.'),
+                ('LEAH', 'YBANEZ', 'B.')
+            ]
+
+            for prof in default_professors:
+                cursor.execute("""
+                    INSERT INTO PROFESSORS (FIRST_NAME, LAST_NAME, MIDDLE_NAME, STATUS)
+                    VALUES (%s, %s, %s, 'active')
+                """, prof)
+            print(f"Inserted {len(default_professors)} professors")
+        else:
+            print("\nProfessors already exist. Skipping insertion.")
         
         connection.commit()
         cursor.close()

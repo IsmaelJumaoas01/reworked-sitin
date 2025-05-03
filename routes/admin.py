@@ -2307,166 +2307,190 @@ def use_points():
 
 @admin_bp.route('/lab-schedules')
 @login_required
-@role_required('ADMIN')
 def lab_schedules():
-    try:
-        print("Accessing lab schedules page")
+    if session.get('user_type') not in ['ADMIN', 'STAFF']:
+        return redirect(url_for('auth.login'))
         
-        # Get all labs
-        labs_query = "SELECT * FROM LABORATORIES WHERE STATUS = 'active'"
-        labs = execute_query(labs_query)
-        print(f"Found {len(labs)} active labs")
+    # Get all active laboratories
+    labs = execute_query("SELECT * FROM LABORATORIES WHERE STATUS = 'active'")
+    
+    # Get all active purposes
+    purposes = execute_query("SELECT * FROM PURPOSES WHERE STATUS = 'active'")
+    
+    # Get all active professors
+    professors = execute_query("SELECT * FROM PROFESSORS WHERE STATUS = 'active' ORDER BY LAST_NAME, FIRST_NAME")
         
-        # Get all purposes
-        purposes_query = "SELECT * FROM PURPOSES WHERE STATUS = 'active'"
-        purposes = execute_query(purposes_query)
-        print(f"Found {len(purposes)} active purposes")
-        
-        # Get all schedules
-        schedules_query = """
-            SELECT s.*, l.LAB_NAME, p.PURPOSE_NAME 
-            FROM LAB_SCHEDULES s
-            JOIN LABORATORIES l ON s.LAB_ID = l.LAB_ID
-            JOIN PURPOSES p ON s.PURPOSE_ID = p.PURPOSE_ID
-            WHERE s.STATUS = 'active'
-            ORDER BY s.DAY_OF_WEEK, s.START_TIME
-        """
-        schedules = execute_query(schedules_query)
-        print(f"Found {len(schedules)} active schedules")
-        
-        return render_template('admin/lab_schedules.html', 
-                             labs=labs, 
-                             purposes=purposes, 
-                             schedules=schedules)
-    except Exception as e:
-        print(f"Error in lab_schedules: {str(e)}")
-        flash('Error loading lab schedules', 'error')
-        return redirect(url_for('admin.dashboard'))
+    # Get all schedules with lab and purpose names
+    schedules = execute_query("""
+        SELECT ls.*, l.LAB_NAME, p.PURPOSE_NAME, 
+               CONCAT(prof.LAST_NAME, ', ', prof.FIRST_NAME, ' ', COALESCE(prof.MIDDLE_NAME, '')) as PROFESSOR_NAME
+        FROM LAB_SCHEDULES ls
+        JOIN LABORATORIES l ON ls.LAB_ID = l.LAB_ID
+        JOIN PURPOSES p ON ls.PURPOSE_ID = p.PURPOSE_ID
+        JOIN PROFESSORS prof ON ls.PROFESSOR_ID = prof.PROFESSOR_ID
+        ORDER BY ls.DAY_OF_WEEK, ls.START_TIME
+    """)
+    
+    return render_template('admin/lab_schedules.html', 
+                         labs=labs, 
+                         purposes=purposes, 
+                         professors=professors,
+                         schedules=schedules)
 
 @admin_bp.route('/lab-schedules/add', methods=['POST'])
 @login_required
-@role_required('ADMIN')
 def add_lab_schedule():
-    try:
-        data = request.get_json()
-        
-        # Validate required fields
-        required_fields = ['lab_id', 'purpose_id', 'day_of_week', 'start_time', 'end_time']
-        for field in required_fields:
-            if not data.get(field):
-                return jsonify({'success': False, 'message': f'{field} is required'}), 400
-        
-        # Check for schedule conflicts
-        conflict_query = """
-        SELECT COUNT(*) as count
-        FROM LAB_SCHEDULES
-        WHERE LAB_ID = %s
-        AND DAY_OF_WEEK = %s
+    if session.get('user_type') not in ['ADMIN', 'STAFF']:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.get_json()
+    
+    # Validate required fields
+    required_fields = ['lab_id', 'purpose_id', 'professor_id', 'day', 'start_time', 'end_time']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({'error': f'Missing required field: {field}'}), 400
+    
+    # Check for schedule conflicts
+    conflict_check = execute_query("""
+        SELECT ls.*, l.LAB_NAME, p.PURPOSE_NAME, CONCAT(pr.FIRST_NAME, ' ', pr.LAST_NAME) as PROFESSOR_NAME
+        FROM LAB_SCHEDULES ls
+        JOIN LABORATORIES l ON ls.LAB_ID = l.LAB_ID
+        JOIN PURPOSES p ON ls.PURPOSE_ID = p.PURPOSE_ID
+        JOIN PROFESSORS pr ON ls.PROFESSOR_ID = pr.PROFESSOR_ID
+        WHERE ls.LAB_ID = %s
+        AND ls.DAY_OF_WEEK = %s
         AND (
-            (START_TIME <= %s AND END_TIME > %s)
-            OR (START_TIME < %s AND END_TIME >= %s)
-            OR (START_TIME >= %s AND END_TIME <= %s)
+            (ls.START_TIME <= %s AND ls.END_TIME > %s)
+            OR (ls.START_TIME < %s AND ls.END_TIME >= %s)
+            OR (ls.START_TIME >= %s AND ls.END_TIME <= %s)
         )
-        AND STATUS = 'active'
-        """
-        conflict_result = execute_query(conflict_query, (
-            data['lab_id'],
-            data['day_of_week'],
-            data['start_time'],
-            data['start_time'],
-            data['end_time'],
-            data['end_time'],
-            data['start_time'],
-            data['end_time']
-        ))
+    """, (data['lab_id'], data['day'], data['start_time'], data['start_time'], 
+          data['end_time'], data['end_time'], data['start_time'], data['end_time']))
+    
+    if conflict_check and len(conflict_check) > 0:
+        conflicting_schedule = conflict_check[0]
+        return jsonify({
+            'error': 'Schedule conflict',
+            'conflicting_schedule': {
+                'lab_name': conflicting_schedule['LAB_NAME'],
+                'purpose': conflicting_schedule['PURPOSE_NAME'],
+                'professor': conflicting_schedule['PROFESSOR_NAME'],
+                'day': conflicting_schedule['DAY_OF_WEEK'],
+                'start_time': str(conflicting_schedule['START_TIME']),
+                'end_time': str(conflicting_schedule['END_TIME'])
+            }
+        }), 400
+    
+    # Check for professor schedule conflicts
+    professor_conflict = execute_query("""
+        SELECT ls.*, l.LAB_NAME, p.PURPOSE_NAME, CONCAT(pr.FIRST_NAME, ' ', pr.LAST_NAME) as PROFESSOR_NAME
+        FROM LAB_SCHEDULES ls
+        JOIN LABORATORIES l ON ls.LAB_ID = l.LAB_ID
+        JOIN PURPOSES p ON ls.PURPOSE_ID = p.PURPOSE_ID
+        JOIN PROFESSORS pr ON ls.PROFESSOR_ID = pr.PROFESSOR_ID
+        WHERE ls.PROFESSOR_ID = %s
+        AND ls.DAY_OF_WEEK = %s
+        AND (
+            (ls.START_TIME <= %s AND ls.END_TIME > %s)
+            OR (ls.START_TIME < %s AND ls.END_TIME >= %s)
+            OR (ls.START_TIME >= %s AND ls.END_TIME <= %s)
+        )
+    """, (data['professor_id'], data['day'], data['start_time'], data['start_time'],
+          data['end_time'], data['end_time'], data['start_time'], data['end_time']))
         
-        if conflict_result[0]['count'] > 0:
-            return jsonify({'success': False, 'message': 'Schedule conflict detected'}), 400
+    if professor_conflict and len(professor_conflict) > 0:
+        conflicting_schedule = professor_conflict[0]
+        return jsonify({
+            'error': 'Professor schedule conflict',
+            'conflicting_schedule': {
+                'lab_name': conflicting_schedule['LAB_NAME'],
+                'purpose': conflicting_schedule['PURPOSE_NAME'],
+                'professor': conflicting_schedule['PROFESSOR_NAME'],
+                'day': conflicting_schedule['DAY_OF_WEEK'],
+                'start_time': str(conflicting_schedule['START_TIME']),
+                'end_time': str(conflicting_schedule['END_TIME'])
+            }
+        }), 400
+    
+    # Insert new schedule
+    result = execute_query("""
+        INSERT INTO LAB_SCHEDULES 
+        (LAB_ID, PURPOSE_ID, PROFESSOR_ID, DAY_OF_WEEK, START_TIME, END_TIME, STATUS)
+        VALUES (%s, %s, %s, %s, %s, %s, 'active')
+    """, (data['lab_id'], data['purpose_id'], data['professor_id'], 
+          data['day'], data['start_time'], data['end_time']))
         
-        # Insert new schedule
-        insert_query = """
-        INSERT INTO LAB_SCHEDULES (
-            LAB_ID, PURPOSE_ID, DAY_OF_WEEK, START_TIME, END_TIME, STATUS
-        ) VALUES (%s, %s, %s, %s, %s, 'active')
-        """
-        execute_query(insert_query, (
-            data['lab_id'],
-            data['purpose_id'],
-            data['day_of_week'],
-            data['start_time'],
-            data['end_time']
-        ))
-        
-        return jsonify({'success': True, 'message': 'Schedule added successfully'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+    if result:
+        return jsonify({'message': 'Schedule added successfully'})
+    else:
+        return jsonify({'error': 'Failed to add schedule'}), 500
 
-@admin_bp.route('/lab-schedules/edit/<int:schedule_id>', methods=['PUT'])
+@admin_bp.route('/lab-schedules/<int:schedule_id>', methods=['PUT'])
 @login_required
-@role_required('ADMIN')
-def edit_lab_schedule(schedule_id):
+def update_lab_schedule(schedule_id):
     try:
         data = request.get_json()
+        required_fields = ['purpose_id', 'professor_id']
         
-        # Validate required fields
-        required_fields = ['lab_id', 'purpose_id', 'day_of_week', 'start_time', 'end_time', 'status']
-        for field in required_fields:
-            if not data.get(field):
-                return jsonify({'success': False, 'message': f'{field} is required'}), 400
+        # Check if all required fields are present
+        if not all(field in data for field in required_fields):
+            return jsonify({'error': 'Missing required fields'}), 400
+            
+        # Check if schedule exists
+        schedule = execute_query("""
+            SELECT * FROM LAB_SCHEDULES 
+            WHERE SCHEDULE_ID = %s
+        """, (schedule_id,))
         
-        # Check for schedule conflicts (excluding current schedule)
-        conflict_query = """
-        SELECT COUNT(*) as count
-        FROM LAB_SCHEDULES
-        WHERE LAB_ID = %s
-        AND DAY_OF_WEEK = %s
-        AND SCHEDULE_ID != %s
-        AND (
-            (START_TIME <= %s AND END_TIME > %s)
-            OR (START_TIME < %s AND END_TIME >= %s)
-            OR (START_TIME >= %s AND END_TIME <= %s)
-        )
-        AND STATUS = 'active'
-        """
-        conflict_result = execute_query(conflict_query, (
-            data['lab_id'],
-            data['day_of_week'],
+        if not schedule:
+            return jsonify({'error': 'Schedule not found'}), 404
+            
+        schedule = schedule[0]  # Get the first (and should be only) result
+        
+        # Check for professor schedule conflicts
+        conflict_check = execute_query("""
+            SELECT COUNT(*) as count
+            FROM LAB_SCHEDULES
+            WHERE PROFESSOR_ID = %s
+            AND SCHEDULE_ID != %s
+            AND DAY_OF_WEEK = %s
+            AND (
+                (START_TIME <= %s AND END_TIME > %s)
+                OR (START_TIME < %s AND END_TIME >= %s)
+                OR (START_TIME >= %s AND END_TIME <= %s)
+            )
+        """, (
+            data['professor_id'],
             schedule_id,
-            data['start_time'],
-            data['start_time'],
-            data['end_time'],
-            data['end_time'],
-            data['start_time'],
-            data['end_time']
+            schedule['DAY_OF_WEEK'],
+            schedule['START_TIME'],
+            schedule['START_TIME'],
+            schedule['END_TIME'],
+            schedule['END_TIME'],
+            schedule['START_TIME'],
+            schedule['END_TIME']
         ))
         
-        if conflict_result[0]['count'] > 0:
-            return jsonify({'success': False, 'message': 'Schedule conflict detected'}), 400
+        if conflict_check and conflict_check[0]['count'] > 0:
+            return jsonify({'error': 'Professor has a conflicting schedule'}), 400
+            
+        # Update the schedule
+        result = execute_query("""
+            UPDATE LAB_SCHEDULES
+            SET PURPOSE_ID = %s,
+                PROFESSOR_ID = %s
+            WHERE SCHEDULE_ID = %s
+        """, (data['purpose_id'], data['professor_id'], schedule_id))
         
-        # Update schedule
-        update_query = """
-        UPDATE LAB_SCHEDULES
-        SET LAB_ID = %s,
-            PURPOSE_ID = %s,
-            DAY_OF_WEEK = %s,
-            START_TIME = %s,
-            END_TIME = %s,
-            STATUS = %s
-        WHERE SCHEDULE_ID = %s
-        """
-        execute_query(update_query, (
-            data['lab_id'],
-            data['purpose_id'],
-            data['day_of_week'],
-            data['start_time'],
-            data['end_time'],
-            data['status'],
-            schedule_id
-        ))
+        if result is None:
+            return jsonify({'error': 'Failed to update schedule'}), 500
+            
+        return jsonify({'message': 'Schedule updated successfully'})
         
-        return jsonify({'success': True, 'message': 'Schedule updated successfully'})
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        print(f"Error updating schedule: {str(e)}")
+        return jsonify({'error': 'Failed to update schedule'}), 500
 
 @admin_bp.route('/lab-schedules/delete/<int:schedule_id>', methods=['DELETE'])
 @login_required
@@ -2571,10 +2595,10 @@ def get_available_slots():
             is_available = True
             for booked in booked_slots:
                 # Convert times to datetime objects for comparison
-                slot_start = datetime.strptime(slot[0], '%H:%M:%S')
-                slot_end = datetime.strptime(slot[1], '%H:%M:%S')
-                booked_start = datetime.strptime(booked['START_TIME'], '%H:%M:%S')
-                booked_end = datetime.strptime(booked['END_TIME'], '%H:%M:%S')
+                slot_start = datetime.strptime(slot[0], '%H:%M:%S').time()
+                slot_end = datetime.strptime(slot[1], '%H:%M:%S').time()
+                booked_start = datetime.strptime(booked['START_TIME'], '%H:%M:%S').time()
+                booked_end = datetime.strptime(booked['END_TIME'], '%H:%M:%S').time()
                 
                 # Check for overlap
                 if (slot_start < booked_end and slot_end > booked_start):
@@ -2582,6 +2606,9 @@ def get_available_slots():
                     break
             
             if is_available:
+                # Calculate duration in hours
+                slot_start = datetime.strptime(slot[0], '%H:%M:%S')
+                slot_end = datetime.strptime(slot[1], '%H:%M:%S')
                 duration = (slot_end - slot_start).total_seconds() / 3600
                 available_slots.append({
                     'START_TIME': slot[0],
@@ -2679,18 +2706,18 @@ def get_available_time_slots():
         lab_id = request.args.get('lab_id')
         day = request.args.get('day')
         
-        print(f"Received parameters:")
-        print(f"- lab_id: {lab_id}")
-        print(f"- day: {day}")
+        print(f"Received request for lab_id: {lab_id}, day: {day}")
         
-        # Validate parameters
-        if not lab_id or not day:
-            print("Missing required parameters")
-            return jsonify({
-                'success': False,
-                'message': 'Lab ID and day are required',
-                'available_slots': []
-            }), 400
+        # Get all booked slots for the lab and day
+        booked_slots = execute_query("""
+            SELECT START_TIME, END_TIME
+            FROM LAB_SCHEDULES
+            WHERE LAB_ID = %s
+            AND DAY_OF_WEEK = %s
+            AND STATUS = 'active'
+        """, (lab_id, day))
+        
+        print(f"Found {len(booked_slots)} booked slots")
         
         # Define all possible time slots
         all_slots = [
@@ -2729,53 +2756,27 @@ def get_available_time_slots():
         
         print(f"Total possible time slots: {len(all_slots)}")
         
-        # Get booked slots for the selected lab and day
-        query = """
-            SELECT START_TIME, END_TIME 
-            FROM LAB_SCHEDULES 
-            WHERE LAB_ID = %s 
-            AND DAY_OF_WEEK = %s 
-            AND STATUS = 'active'
-        """
-        booked_slots = execute_query(query, (lab_id, day))
-        
-        if booked_slots is None:
-            print("Error executing query to get booked slots")
-            return jsonify({
-                'success': False,
-                'message': 'Error fetching booked slots',
-                'available_slots': []
-            }), 500
-            
-        print(f"Found {len(booked_slots)} booked slots")
-        if booked_slots:
-            print("Booked slots:")
-            for slot in booked_slots:
-                print(f"- {slot['START_TIME']} to {slot['END_TIME']}")
-        
-        # Filter out booked slots
         available_slots = []
         for slot in all_slots:
             is_available = True
+            slot_start = datetime.strptime(slot[0], '%H:%M:%S').time()
+            slot_end = datetime.strptime(slot[1], '%H:%M:%S').time()
+            
             for booked in booked_slots:
-                try:
-                    # Convert times to datetime objects for comparison
-                    slot_start = datetime.strptime(slot[0], '%H:%M:%S')
-                    slot_end = datetime.strptime(slot[1], '%H:%M:%S')
-                    booked_start = datetime.strptime(booked['START_TIME'], '%H:%M:%S')
-                    booked_end = datetime.strptime(booked['END_TIME'], '%H:%M:%S')
-                    
-                    # Check for overlap
-                    if (slot_start < booked_end and slot_end > booked_start):
-                        is_available = False
-                        print(f"Slot {slot[0]}-{slot[1]} overlaps with booked slot {booked['START_TIME']}-{booked['END_TIME']}")
-                        break
-                except Exception as e:
-                    print(f"Error comparing time slots: {str(e)}")
-                    continue
+                booked_start = datetime.strptime(str(booked['START_TIME']), '%H:%M:%S').time()
+                booked_end = datetime.strptime(str(booked['END_TIME']), '%H:%M:%S').time()
+                
+                # Check for overlap
+                if (slot_start < booked_end and slot_end > booked_start):
+                    is_available = False
+                    break
             
             if is_available:
-                duration = (slot_end - slot_start).total_seconds() / 3600
+                # Calculate duration in hours
+                slot_start_dt = datetime.strptime(slot[0], '%H:%M:%S')
+                slot_end_dt = datetime.strptime(slot[1], '%H:%M:%S')
+                duration = (slot_end_dt - slot_start_dt).total_seconds() / 3600
+                
                 available_slots.append({
                     'START_TIME': slot[0],
                     'END_TIME': slot[1],
@@ -2783,22 +2784,23 @@ def get_available_time_slots():
                 })
         
         print(f"Found {len(available_slots)} available slots")
-        print("Available slots:")
-        for slot in available_slots:
-            print(f"- {slot['START_TIME']} to {slot['END_TIME']} ({slot['DURATION']} hours)")
+        if available_slots:
+            print("Available slots:")
+            for slot in available_slots:
+                print(f"- {slot['START_TIME']} to {slot['END_TIME']} ({slot['DURATION']} hours)")
+        
         print("=== End of Get Available Time Slots Request ===\n")
         
         return jsonify({
             'success': True,
             'available_slots': available_slots
         })
+        
     except Exception as e:
-        print(f"\nError in get_available_time_slots: {str(e)}")
-        print("Stack trace:", traceback.format_exc())
-        print("=== End of Get Available Time Slots Request (Error) ===\n")
+        print(f"Error in get_available_time_slots: {str(e)}")
         return jsonify({
             'success': False,
-            'message': f'Failed to get available time slots: {str(e)}',
+            'message': str(e),
             'available_slots': []
         }), 500
 
@@ -2854,12 +2856,22 @@ def add_lab_schedule_page():
         print(f"Found {len(purposes)} active purposes")
         print("Purposes:", [purpose['PURPOSE_NAME'] for purpose in purposes])
         
+        # Get all professors
+        professors_query = "SELECT * FROM PROFESSORS WHERE STATUS = 'active'"
+        professors = execute_query(professors_query)
+        # Format professor names
+        for prof in professors:
+            prof['PROFESSOR_NAME'] = f"{prof['LAST_NAME']}, {prof['FIRST_NAME']} {prof['MIDDLE_NAME'] if prof['MIDDLE_NAME'] else ''}"
+        print(f"Found {len(professors)} active professors")
+        print("Professors:", [prof['PROFESSOR_NAME'] for prof in professors])
+        
         print("Rendering template: admin/add_lab_schedule.html")
         print("=== End of Add Lab Schedule Page Request ===\n")
         
         return render_template('admin/add_lab_schedule.html', 
                              labs=labs, 
-                             purposes=purposes)
+                             purposes=purposes,
+                             professors=professors)
     except Exception as e:
         print(f"\nError in add_lab_schedule_page: {str(e)}")
         print("Stack trace:", traceback.format_exc())
@@ -3171,3 +3183,82 @@ def update_resource(resource_id):
     except Exception as e:
         print(f"Error updating resource: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/professors', methods=['GET'])
+def professors():
+    if 'user_id' not in session or session.get('user_type') not in ['ADMIN', 'STAFF']:
+        return redirect(url_for('auth.login'))
+    
+    professors = execute_query("""
+        SELECT * FROM PROFESSORS 
+        ORDER BY LAST_NAME, FIRST_NAME
+    """)
+    
+    return render_template('admin/professors.html', professors=professors)
+
+@admin_bp.route('/professors/add', methods=['POST'])
+def add_professor():
+    if 'user_id' not in session or session.get('user_type') not in ['ADMIN', 'STAFF']:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.json
+    first_name = data.get('first_name')
+    last_name = data.get('last_name')
+    middle_name = data.get('middle_name', '')
+    
+    if not first_name or not last_name:
+        return jsonify({'error': 'First name and last name are required'}), 400
+    
+    result = execute_query("""
+        INSERT INTO PROFESSORS (FIRST_NAME, LAST_NAME, MIDDLE_NAME)
+        VALUES (%s, %s, %s)
+    """, (first_name, last_name, middle_name))
+    
+    if result:
+        return jsonify({'message': 'Professor added successfully'})
+    return jsonify({'error': 'Failed to add professor'}), 500
+
+@admin_bp.route('/professors/<int:professor_id>', methods=['PUT'])
+def update_professor(professor_id):
+    if 'user_id' not in session or session.get('user_type') not in ['ADMIN', 'STAFF']:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.json
+    first_name = data.get('first_name')
+    last_name = data.get('last_name')
+    middle_name = data.get('middle_name', '')
+    status = data.get('status', 'active')
+    
+    if not first_name or not last_name:
+        return jsonify({'error': 'First name and last name are required'}), 400
+    
+    result = execute_query("""
+        UPDATE PROFESSORS 
+        SET FIRST_NAME = %s, LAST_NAME = %s, MIDDLE_NAME = %s, STATUS = %s
+        WHERE PROFESSOR_ID = %s
+    """, (first_name, last_name, middle_name, status, professor_id))
+    
+    if result is not None:
+        return jsonify({'message': 'Professor updated successfully'})
+    return jsonify({'error': 'Failed to update professor'}), 500
+
+@admin_bp.route('/professors/<int:professor_id>', methods=['DELETE'])
+def delete_professor(professor_id):
+    if 'user_id' not in session or session.get('user_type') not in ['ADMIN', 'STAFF']:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    # Check if professor is assigned to any schedules
+    schedules = execute_query("""
+        SELECT COUNT(*) as count FROM LAB_SCHEDULES WHERE PROFESSOR_ID = %s
+    """, (professor_id,))
+    
+    if schedules and schedules[0]['count'] > 0:
+        return jsonify({'error': 'Cannot delete professor with assigned schedules'}), 400
+    
+    result = execute_query("""
+        DELETE FROM PROFESSORS WHERE PROFESSOR_ID = %s
+    """, (professor_id,))
+    
+    if result is not None:
+        return jsonify({'message': 'Professor deleted successfully'})
+    return jsonify({'error': 'Failed to delete professor'}), 500

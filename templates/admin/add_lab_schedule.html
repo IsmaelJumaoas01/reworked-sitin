@@ -83,6 +83,16 @@
                 </div>
 
                 <div class="col-md-12">
+                    <label for="professor" class="form-label">Professor</label>
+                    <select class="form-select" id="professor" name="professor_id" required>
+                        <option value="">Select Professor</option>
+                        {% for professor in professors %}
+                        <option value="{{ professor.PROFESSOR_ID }}">{{ professor.PROFESSOR_NAME }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-12">
                     <label for="status" class="form-label">Status</label>
                     <select class="form-select" id="status" name="status" required>
                         <option value="active">Active</option>
@@ -387,7 +397,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const formData = {
                 lab_id: document.getElementById('selectedLab').value,
                 purpose_id: document.getElementById('purpose').value,
-                day_of_week: document.getElementById('selectedDay').value,
+                professor_id: document.getElementById('professor').value,
+                day: document.getElementById('selectedDay').value,
                 start_time: document.getElementById('startTime').value,
                 end_time: document.getElementById('endTime').value,
                 status: document.getElementById('status').value
@@ -404,6 +415,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!formData.purpose_id) {
                 debugLog('Validation failed: No purpose selected');
                 alert('Please select a purpose');
+                return;
+            }
+
+            if (!formData.professor_id) {
+                debugLog('Validation failed: No professor selected');
+                alert('Please select a professor');
                 return;
             }
             
@@ -423,10 +440,177 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 debugLog('Server response:', data);
                 if (data.success) {
-                    alert('Schedule added successfully');
-                    window.location.href = '/admin/lab-schedules';
+                    // Format the time for display
+                    const startTime = new Date(`2000-01-01T${formData.start_time}`).toLocaleTimeString('en-US', { 
+                        hour: 'numeric', 
+                        minute: '2-digit', 
+                        hour12: true 
+                    });
+                    const endTime = new Date(`2000-01-01T${formData.end_time}`).toLocaleTimeString('en-US', { 
+                        hour: 'numeric', 
+                        minute: '2-digit', 
+                        hour12: true 
+                    });
+
+                    // Get the selected values for display
+                    const labSelect = document.getElementById('lab');
+                    const purposeSelect = document.getElementById('purpose');
+                    const professorSelect = document.getElementById('professor');
+                    const daySelect = document.getElementById('day');
+
+                    const labName = labSelect.options[labSelect.selectedIndex].text;
+                    const purposeName = purposeSelect.options[purposeSelect.selectedIndex].text;
+                    const professorName = professorSelect.options[professorSelect.selectedIndex].text;
+                    const dayName = daySelect.options[daySelect.selectedIndex].text;
+
+                    // Create and show the success modal
+                    const modalHtml = `
+                        <div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-success text-white">
+                                        <h5 class="modal-title" id="successModalLabel">Schedule Added Successfully</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="alert alert-success">
+                                            The following schedule has been added successfully:
+                                        </div>
+                                        <div class="table-responsive">
+                                            <table class="table table-bordered">
+                                                <tbody>
+                                                    <tr>
+                                                        <th>Laboratory</th>
+                                                        <td>${labName}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <th>Purpose</th>
+                                                        <td>${purposeName}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <th>Professor</th>
+                                                        <td>${professorName}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <th>Day</th>
+                                                        <td>${dayName}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <th>Time</th>
+                                                        <td>${startTime} - ${endTime}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <th>Status</th>
+                                                        <td><span class="badge bg-success">${formData.status}</span></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-primary" onclick="window.location.href='/admin/lab-schedules'">View All Schedules</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    // Remove any existing modal
+                    const existingModal = document.getElementById('successModal');
+                    if (existingModal) {
+                        existingModal.remove();
+                    }
+
+                    // Add the new modal to the document
+                    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+                    // Show the modal
+                    const modal = new bootstrap.Modal(document.getElementById('successModal'));
+                    modal.show();
+
+                    // Add event listener for when modal is hidden
+                    document.getElementById('successModal').addEventListener('hidden.bs.modal', function () {
+                        window.location.href = '/admin/lab-schedules';
+                    });
                 } else {
-                    alert(data.message || 'Error adding schedule');
+                    if (data.conflicting_schedule) {
+                        // Format the time for display
+                        const startTime = new Date(`2000-01-01T${data.conflicting_schedule.start_time}`).toLocaleTimeString('en-US', { 
+                            hour: 'numeric', 
+                            minute: '2-digit', 
+                            hour12: true 
+                        });
+                        const endTime = new Date(`2000-01-01T${data.conflicting_schedule.end_time}`).toLocaleTimeString('en-US', { 
+                            hour: 'numeric', 
+                            minute: '2-digit', 
+                            hour12: true 
+                        });
+
+                        // Create and show the conflict modal
+                        const modalHtml = `
+                            <div class="modal fade" id="conflictModal" tabindex="-1" aria-labelledby="conflictModalLabel" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="conflictModalLabel">Schedule Conflict</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="alert alert-warning">
+                                                ${data.error === 'Schedule conflict' ? 
+                                                    'This time slot conflicts with an existing schedule:' : 
+                                                    'This professor is already assigned to another schedule at this time:'}
+                                            </div>
+                                            <div class="table-responsive">
+                                                <table class="table table-bordered">
+                                                    <tbody>
+                                                        <tr>
+                                                            <th>Laboratory</th>
+                                                            <td>${data.conflicting_schedule.lab_name}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <th>Purpose</th>
+                                                            <td>${data.conflicting_schedule.purpose}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <th>Professor</th>
+                                                            <td>${data.conflicting_schedule.professor}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <th>Day</th>
+                                                            <td>${data.conflicting_schedule.day}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <th>Time</th>
+                                                            <td>${startTime} - ${endTime}</td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+
+                        // Remove any existing modal
+                        const existingModal = document.getElementById('conflictModal');
+                        if (existingModal) {
+                            existingModal.remove();
+                        }
+
+                        // Add the new modal to the document
+                        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+                        // Show the modal
+                        const modal = new bootstrap.Modal(document.getElementById('conflictModal'));
+                        modal.show();
+                    } else {
+                        alert(data.message || 'Error adding schedule');
+                    }
                 }
             })
             .catch(error => {

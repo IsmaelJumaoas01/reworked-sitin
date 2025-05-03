@@ -45,8 +45,12 @@
                                                 <table class="table table-sm mb-0">
                                                     <thead class="bg-light">
                                                         <tr>
-                                                            <th>Time</th>
+                                                            <th>Lab</th>
                                                             <th>Purpose</th>
+                                                            <th>Professor</th>
+                                                            <th>Day</th>
+                                                            <th>Start Time</th>
+                                                            <th>End Time</th>
                                                             <th>Status</th>
                                                             <th>Actions</th>
                                                         </tr>
@@ -54,35 +58,32 @@
                                                     <tbody>
                                                         {% for schedule in schedules if schedule.DAY_OF_WEEK == day and schedule.LAB_ID == lab.LAB_ID %}
                                                         <tr>
+                                                            <td>{{ schedule.LAB_NAME }}</td>
+                                                            <td>{{ schedule.PURPOSE_NAME }}</td>
+                                                            <td>{{ schedule.PROFESSOR_NAME }}</td>
+                                                            <td>{{ schedule.DAY_OF_WEEK }}</td>
+                                                            <td>{{ schedule.START_TIME }}</td>
+                                                            <td>{{ schedule.END_TIME }}</td>
                                                             <td>
-                                                                <small>{{ schedule.START_TIME }} - {{ schedule.END_TIME }}</small>
-                                                            </td>
-                                                            <td>
-                                                                <small>{{ schedule.PURPOSE_NAME }}</small>
-                                                            </td>
-                                                            <td>
-                                                                <span class="badge bg-{{ 'success' if schedule.STATUS == 'active' else 'danger' }}">
+                                                                <span class="badge {% if schedule.STATUS == 'active' %}bg-success{% else %}bg-danger{% endif %}">
                                                                     {{ schedule.STATUS }}
                                                                 </span>
                                                             </td>
                                                             <td>
-                                                                <div class="btn-group btn-group-sm">
-                                                                    <button class="btn btn-info edit-schedule" 
-                                                                            data-bs-toggle="modal" 
-                                                                            data-bs-target="#scheduleModal"
-                                                                            data-schedule-id="{{ schedule.SCHEDULE_ID }}"
-                                                                            data-lab-id="{{ schedule.LAB_ID }}"
-                                                                            data-purpose-id="{{ schedule.PURPOSE_ID }}"
+                                                                <button class="btn btn-sm btn-primary edit-schedule" 
+                                                                        data-id="{{ schedule.SCHEDULE_ID }}"
+                                                                        data-lab="{{ schedule.LAB_ID }}"
+                                                                        data-purpose="{{ schedule.PURPOSE_ID }}"
+                                                                        data-professor="{{ schedule.PROFESSOR_ID }}"
                                                                             data-day="{{ schedule.DAY_OF_WEEK }}"
-                                                                            data-start-time="{{ schedule.START_TIME }}"
-                                                                            data-end-time="{{ schedule.END_TIME }}"
+                                                                        data-start="{{ schedule.START_TIME }}"
+                                                                        data-end="{{ schedule.END_TIME }}"
                                                                             data-status="{{ schedule.STATUS }}">
                                                                         <i class="fas fa-edit"></i>
                                                                     </button>
-                                                                    <button class="btn btn-danger delete-schedule" data-schedule-id="{{ schedule.SCHEDULE_ID }}">
+                                                                <button class="btn btn-sm btn-danger delete-schedule" data-id="{{ schedule.SCHEDULE_ID }}">
                                                                         <i class="fas fa-trash"></i>
                                                                     </button>
-                                                                </div>
                                                             </td>
                                                         </tr>
                                                         {% endfor %}
@@ -125,10 +126,19 @@
                     </div>
                     <div class="mb-3">
                         <label for="purpose" class="form-label">Purpose</label>
-                        <select class="form-select" id="purpose" name="purpose_id" required>
+                        <select class="form-select" id="purpose" required>
                             <option value="">Select Purpose</option>
                             {% for purpose in purposes %}
                             <option value="{{ purpose.PURPOSE_ID }}">{{ purpose.PURPOSE_NAME }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="professor" class="form-label">Professor</label>
+                        <select class="form-select" id="professor" required>
+                            <option value="">Select Professor</option>
+                            {% for professor in professors %}
+                            <option value="{{ professor.PROFESSOR_ID }}">{{ professor.LAST_NAME }}, {{ professor.FIRST_NAME }} {{ professor.MIDDLE_NAME }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -166,6 +176,45 @@
         </div>
     </div>
 </div>
+
+<!-- Edit Schedule Modal -->
+<div class="modal fade" id="editScheduleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Schedule</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editScheduleForm">
+                    <input type="hidden" id="editScheduleId">
+                    <div class="mb-3">
+                        <label for="editPurpose" class="form-label">Purpose</label>
+                        <select class="form-select" id="editPurpose" required>
+                            <option value="">Select Purpose</option>
+                            {% for purpose in purposes %}
+                            <option value="{{ purpose.PURPOSE_ID }}">{{ purpose.PURPOSE_NAME }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editProfessor" class="form-label">Professor</label>
+                        <select class="form-select" id="editProfessor" required>
+                            <option value="">Select Professor</option>
+                            {% for professor in professors %}
+                            <option value="{{ professor.PROFESSOR_ID }}">{{ professor.LAST_NAME }}, {{ professor.FIRST_NAME }} {{ professor.MIDDLE_NAME }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="updateSchedule">Update Schedule</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -188,11 +237,11 @@ function getAvailableTimeSlots(labId, day) {
         debugLog('Missing required parameters');
         document.getElementById('timeSlot').disabled = true;
         document.getElementById('timeSlot').innerHTML = '<option value="">Select Time Slot</option>';
-        return;
+        return Promise.reject('Missing required parameters');
     }
     
     debugLog('Fetching available slots from server...');
-    fetch(`/admin/lab-schedules/available-slots?lab_id=${labId}&day_of_week=${day}`)
+    return fetch(`/admin/lab-schedules/available-slots?lab_id=${labId}&day_of_week=${day}`)
         .then(response => {
             debugLog('Server response status:', response.status);
             return response.json();
@@ -226,9 +275,11 @@ function getAvailableTimeSlots(labId, day) {
                 });
                 timeSlotSelect.disabled = false;
                 debugLog('Time slot dropdown populated and enabled');
+                return data.available_slots;
             } else {
                 timeSlotSelect.disabled = true;
                 debugLog('No available time slots or error:', data.message);
+                return [];
             }
         })
         .catch(error => {
@@ -236,6 +287,7 @@ function getAvailableTimeSlots(labId, day) {
             document.getElementById('timeSlot').disabled = true;
             document.getElementById('timeSlot').innerHTML = '<option value="">Error loading time slots</option>';
             debugLog('Error occurred while fetching time slots:', error);
+            throw error;
         });
 }
 
@@ -328,42 +380,98 @@ document.getElementById('saveSchedule').addEventListener('click', function() {
 // Edit schedule handler
 document.querySelectorAll('.edit-schedule').forEach(button => {
     button.addEventListener('click', function() {
-        const scheduleId = this.dataset.scheduleId;
-        const labId = this.dataset.labId;
-        const purposeId = this.dataset.purposeId;
-        const day = this.dataset.day;
-        const startTime = this.dataset.startTime;
-        const endTime = this.dataset.endTime;
-        const status = this.dataset.status;
+        const scheduleId = this.dataset.id;
+        const purposeId = this.dataset.purpose;
+        const professorId = this.dataset.professor;
         
         debugLog('Editing schedule:', {
-            scheduleId, labId, purposeId, day, startTime, endTime, status
+            scheduleId, purposeId, professorId
         });
         
-        // Update modal title
-        document.getElementById('scheduleModalLabel').textContent = 'Edit Schedule';
+        // Populate edit form
+        document.getElementById('editScheduleId').value = scheduleId;
+        document.getElementById('editPurpose').value = purposeId;
+        document.getElementById('editProfessor').value = professorId;
         
-        // Populate form
-        document.getElementById('scheduleId').value = scheduleId;
-        document.getElementById('lab').value = labId;
-        document.getElementById('purpose').value = purposeId;
-        document.getElementById('day').value = day;
-        document.getElementById('status').value = status;
-        
-        // Get available time slots and select the current one
-        getAvailableTimeSlots(labId, day).then(() => {
-            const timeSlotSelect = document.getElementById('timeSlot');
-            const currentSlot = `${startTime},${endTime}`;
-            timeSlotSelect.value = currentSlot;
-        });
+        // Show the edit modal
+        const editModal = new bootstrap.Modal(document.getElementById('editScheduleModal'));
+        editModal.show();
     });
+});
+
+// Update schedule handler
+document.getElementById('updateSchedule').addEventListener('click', function() {
+    const formData = {
+        purpose_id: document.getElementById('editPurpose').value,
+        professor_id: document.getElementById('editProfessor').value
+    };
+    
+    const scheduleId = document.getElementById('editScheduleId').value;
+    
+    debugLog('Updating schedule:', formData);
+    
+    fetch(`/admin/lab-schedules/${scheduleId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => {
+        debugLog('Server response status:', response.status);
+        return response.json();
+    })
+    .then(data => {
+        debugLog('Server response:', data);
+        if (data.message === 'Schedule updated successfully') {
+            // Get the updated values
+            const purposeSelect = document.getElementById('editPurpose');
+            const professorSelect = document.getElementById('editProfessor');
+            
+            const purposeName = purposeSelect.options[purposeSelect.selectedIndex].text;
+            const professorName = professorSelect.options[professorSelect.selectedIndex].text;
+            
+            // Find the row in the table and update it
+            const row = document.querySelector(`button[data-id="${scheduleId}"]`).closest('tr');
+            if (row) {
+                // Update the purpose and professor cells
+                row.querySelector('td:nth-child(2)').textContent = purposeName;
+                row.querySelector('td:nth-child(3)').textContent = professorName;
+                
+                // Update the data attributes on the edit button
+                const editButton = row.querySelector('.edit-schedule');
+                editButton.dataset.purpose = formData.purpose_id;
+                editButton.dataset.professor = formData.professor_id;
+            }
+            
+            // Close the modal
+            const editModal = bootstrap.Modal.getInstance(document.getElementById('editScheduleModal'));
+            editModal.hide();
+            
+            // Show success message
+            alert('Schedule updated successfully');
+        } else {
+            alert(data.error || 'Error updating schedule');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        debugLog('Error updating schedule:', error);
+        alert('Error updating schedule');
+    });
+});
+
+// Reset edit form when modal is closed
+document.getElementById('editScheduleModal').addEventListener('hidden.bs.modal', function() {
+    document.getElementById('editScheduleForm').reset();
+    document.getElementById('editScheduleId').value = '';
 });
 
 // Delete schedule handler
 document.querySelectorAll('.delete-schedule').forEach(button => {
     button.addEventListener('click', function() {
         if (confirm('Are you sure you want to delete this schedule?')) {
-            const scheduleId = this.dataset.scheduleId;
+            const scheduleId = this.dataset.id;
             
             fetch(`/admin/lab-schedules/delete/${scheduleId}`, {
                 method: 'DELETE'
@@ -392,6 +500,79 @@ document.getElementById('scheduleModal').addEventListener('hidden.bs.modal', fun
     document.getElementById('scheduleModalLabel').textContent = 'Add New Schedule';
     document.getElementById('timeSlot').disabled = true;
     document.getElementById('timeSlot').innerHTML = '<option value="">Select Time Slot</option>';
+});
+
+$(document).ready(function() {
+    // Initialize DataTable
+    $('#schedulesTable').DataTable();
+
+    // Edit Schedule
+    $('.edit-schedule').click(function() {
+        const id = $(this).data('id');
+        const labId = $(this).data('lab');
+        const purposeId = $(this).data('purpose');
+        const professorId = $(this).data('professor');
+        const day = $(this).data('day');
+        const startTime = $(this).data('start');
+        const endTime = $(this).data('end');
+        const status = $(this).data('status');
+
+        $('#editScheduleId').val(id);
+        $('#editLab').val(labId);
+        $('#editPurpose').val(purposeId);
+        $('#editProfessor').val(professorId);
+        $('#editDay').val(day);
+        $('#editStartTime').val(startTime);
+        $('#editEndTime').val(endTime);
+        $('#editStatus').val(status);
+
+        $('#editScheduleModal').modal('show');
+    });
+
+    // Update Schedule
+    $('#updateSchedule').click(function() {
+        const id = $('#editScheduleId').val();
+        const data = {
+            lab_id: $('#editLab').val(),
+            purpose_id: $('#editPurpose').val(),
+            professor_id: $('#editProfessor').val(),
+            day: $('#editDay').val(),
+            start_time: $('#editStartTime').val(),
+            end_time: $('#editEndTime').val(),
+            status: $('#editStatus').val()
+        };
+
+        $.ajax({
+            url: `/admin/lab-schedules/${id}`,
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function(response) {
+                location.reload();
+            },
+            error: function(xhr) {
+                alert(xhr.responseJSON.error || 'Failed to update schedule');
+            }
+        });
+    });
+
+    // Delete Schedule
+    $('.delete-schedule').click(function() {
+        if (confirm('Are you sure you want to delete this schedule?')) {
+            const id = $(this).data('id');
+
+            $.ajax({
+                url: `/admin/lab-schedules/delete/${id}`,
+                method: 'DELETE',
+                success: function(response) {
+                    location.reload();
+                },
+                error: function(xhr) {
+                    alert(xhr.responseJSON.error || 'Failed to delete schedule');
+                }
+            });
+        }
+    });
 });
 </script>
 {% endblock %}

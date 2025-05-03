@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h1 class="mt-4">Professor Management</h1>
+    <ol class="breadcrumb mb-4">
+        <li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a></li>
+        <li class="breadcrumb-item active">Professors</li>
+    </ol>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-table me-1"></i>
+            Professors
+            <button type="button" class="btn btn-primary float-end" data-bs-toggle="modal" data-bs-target="#addProfessorModal">
+                Add Professor
+            </button>
+        </div>
+        <div class="card-body">
+            <table id="professorsTable" class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Last Name</th>
+                        <th>First Name</th>
+                        <th>Middle Name</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for professor in professors %}
+                    <tr>
+                        <td>{{ professor.PROFESSOR_ID }}</td>
+                        <td>{{ professor.LAST_NAME }}</td>
+                        <td>{{ professor.FIRST_NAME }}</td>
+                        <td>{{ professor.MIDDLE_NAME }}</td>
+                        <td>
+                            <span class="badge {% if professor.STATUS == 'active' %}bg-success{% else %}bg-danger{% endif %}">
+                                {{ professor.STATUS }}
+                            </span>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-primary edit-professor" 
+                                    data-id="{{ professor.PROFESSOR_ID }}"
+                                    data-first-name="{{ professor.FIRST_NAME }}"
+                                    data-last-name="{{ professor.LAST_NAME }}"
+                                    data-middle-name="{{ professor.MIDDLE_NAME }}"
+                                    data-status="{{ professor.STATUS }}">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm btn-danger delete-professor" data-id="{{ professor.PROFESSOR_ID }}">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add Professor Modal -->
+<div class="modal fade" id="addProfessorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Professor</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addProfessorForm">
+                    <div class="mb-3">
+                        <label for="firstName" class="form-label">First Name</label>
+                        <input type="text" class="form-control" id="firstName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="lastName" class="form-label">Last Name</label>
+                        <input type="text" class="form-control" id="lastName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="middleName" class="form-label">Middle Name</label>
+                        <input type="text" class="form-control" id="middleName">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="saveProfessor">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Professor Modal -->
+<div class="modal fade" id="editProfessorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Professor</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editProfessorForm">
+                    <input type="hidden" id="editProfessorId">
+                    <div class="mb-3">
+                        <label for="editFirstName" class="form-label">First Name</label>
+                        <input type="text" class="form-control" id="editFirstName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editLastName" class="form-label">Last Name</label>
+                        <input type="text" class="form-control" id="editLastName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editMiddleName" class="form-label">Middle Name</label>
+                        <input type="text" class="form-control" id="editMiddleName">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editStatus" class="form-label">Status</label>
+                        <select class="form-select" id="editStatus">
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="updateProfessor">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Initialize DataTable
+    $('#professorsTable').DataTable();
+
+    // Add Professor
+    $('#saveProfessor').click(function() {
+        const data = {
+            first_name: $('#firstName').val(),
+            last_name: $('#lastName').val(),
+            middle_name: $('#middleName').val()
+        };
+
+        $.ajax({
+            url: "{{ url_for('admin.add_professor') }}",
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function(response) {
+                location.reload();
+            },
+            error: function(xhr) {
+                alert(xhr.responseJSON.error || 'Failed to add professor');
+            }
+        });
+    });
+
+    // Edit Professor
+    $('.edit-professor').click(function() {
+        const id = $(this).data('id');
+        const firstName = $(this).data('first-name');
+        const lastName = $(this).data('last-name');
+        const middleName = $(this).data('middle-name');
+        const status = $(this).data('status');
+
+        $('#editProfessorId').val(id);
+        $('#editFirstName').val(firstName);
+        $('#editLastName').val(lastName);
+        $('#editMiddleName').val(middleName);
+        $('#editStatus').val(status);
+
+        $('#editProfessorModal').modal('show');
+    });
+
+    // Update Professor
+    $('#updateProfessor').click(function() {
+        const id = $('#editProfessorId').val();
+        const data = {
+            first_name: $('#editFirstName').val(),
+            last_name: $('#editLastName').val(),
+            middle_name: $('#editMiddleName').val(),
+            status: $('#editStatus').val()
+        };
+
+        $.ajax({
+            url: `/admin/professors/${id}`,
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function(response) {
+                location.reload();
+            },
+            error: function(xhr) {
+                alert(xhr.responseJSON.error || 'Failed to update professor');
+            }
+        });
+    });
+
+    // Delete Professor
+    $('.delete-professor').click(function() {
+        if (confirm('Are you sure you want to delete this professor?')) {
+            const id = $(this).data('id');
+
+            $.ajax({
+                url: `/admin/professors/${id}`,
+                method: 'DELETE',
+                success: function(response) {
+                    location.reload();
+                },
+                error: function(xhr) {
+                    alert(xhr.responseJSON.error || 'Failed to delete professor');
+                }
+            });
+        }
+    });
+});
+</script>
+{% endblock %} 
