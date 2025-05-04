@@ -320,6 +320,22 @@ document.getElementById('day').addEventListener('change', function() {
     }
 });
 
+// Function to format time string to 12-hour format
+function formatTime(timeStr) {
+    if (!timeStr) return 'Invalid Time';
+    try {
+        const date = new Date(`2000-01-01T${timeStr}`);
+        return date.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        });
+    } catch (e) {
+        console.error('Error formatting time:', e);
+        return 'Invalid Time';
+    }
+}
+
 // Save schedule handler
 document.getElementById('saveSchedule').addEventListener('click', function() {
     const form = document.getElementById('scheduleForm');
@@ -328,7 +344,8 @@ document.getElementById('saveSchedule').addEventListener('click', function() {
     const formData = {
         lab_id: document.getElementById('lab').value,
         purpose_id: document.getElementById('purpose').value,
-        day_of_week: document.getElementById('day').value,
+        professor_id: document.getElementById('professor').value,
+        day: document.getElementById('day').value,
         time_slot: document.getElementById('timeSlot').value,
         status: document.getElementById('status').value
     };
@@ -363,7 +380,23 @@ document.getElementById('saveSchedule').addEventListener('click', function() {
     })
     .then(data => {
         debugLog('Server response:', data);
-        if (data.success) {
+        if (data.error === 'Schedule conflict' || data.error === 'Professor schedule conflict') {
+            const conflict = data.conflicting_schedule;
+            const formattedStartTime = formatTime(conflict.start_time);
+            const formattedEndTime = formatTime(conflict.end_time);
+            
+            let message = data.error === 'Schedule conflict' ? 
+                'This time slot conflicts with an existing schedule:\n\n' :
+                'This professor is already assigned to another schedule at this time:\n\n';
+                
+            message += `Laboratory: ${conflict.lab_name}\n`;
+            message += `Purpose: ${conflict.purpose}\n`;
+            message += `Professor: ${conflict.professor}\n`;
+            message += `Day: ${conflict.day}\n`;
+            message += `Time: ${formattedStartTime} - ${formattedEndTime}`;
+            
+            alert(message);
+        } else if (data.success) {
             alert(scheduleId ? 'Schedule updated successfully' : 'Schedule added successfully');
             location.reload();
         } else {

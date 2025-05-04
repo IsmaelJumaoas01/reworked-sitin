@@ -60,7 +60,7 @@
                     </ul>
                 </li>
                 <li class="menu-item">
-                    <a href="{{ url_for('reservation.admin_reservations') }}" class="menu-link">
+                    <a href="{{ url_for('admin.manage_reservations') }}" class="menu-link">
                         <i class="fas fa-calendar-check"></i>
                         <span>Reservations</span>
                     </a>
@@ -160,12 +160,6 @@
                     </a>
                 </li>
                 {% elif session.get('user_type') == 'STUDENT' %}
-                <li class="menu-item">
-                    <a href="{{ url_for('sit_in.request_sit_in') }}" class="menu-link">
-                        <i class="fas fa-plus"></i>
-                        <span>Request Sit-In</span>
-                    </a>
-                </li>
                 <li class="menu-item">
                     <a href="{{ url_for('reservation.student_reservation') }}" class="menu-link">
                         <i class="fas fa-calendar-plus"></i>

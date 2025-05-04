@@ -917,6 +917,8 @@ def inject_announcements():
         LIMIT 5
         """
         announcements = execute_query(announcement_query)
+        # Convert keys to lowercase
+        announcements = [{k.lower(): v for k, v in announcement.items()} for announcement in announcements]
         return {'announcements': announcements}
     except Exception as e:
         print(f"Error fetching announcements: {str(e)}")

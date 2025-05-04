@@ -40,6 +40,8 @@ def inject_announcements():
         LIMIT 5
         """
         announcements = execute_query(announcement_query)
+        # Convert keys to lowercase
+        announcements = [{k.lower(): v for k, v in announcement.items()} for announcement in announcements]
         return {'announcements': announcements}
     except Exception as e:
         print(f"Error fetching announcements: {str(e)}")
@@ -999,7 +1001,14 @@ def sit_in_management():
             u.FIRSTNAME,
             u.LASTNAME,
             l.LAB_NAME,
-            p.PURPOSE_NAME
+            p.PURPOSE_NAME,
+            DATE_FORMAT(sr.TIME_IN, '%h:%i %p') as formatted_time_in,
+            DATE_FORMAT(sr.TIME_OUT, '%h:%i %p') as formatted_time_out,
+            CASE
+                WHEN sr.TIME_OUT IS NOT NULL THEN
+                    TIMESTAMPDIFF(MINUTE, sr.TIME_IN, sr.TIME_OUT)
+                ELSE NULL
+            END as duration_minutes
         FROM SIT_IN_RECORDS sr
         JOIN USERS u ON sr.USER_IDNO = u.IDNO
         JOIN LABORATORIES l ON sr.LAB_ID = l.LAB_ID
@@ -1009,6 +1018,19 @@ def sit_in_management():
         ORDER BY sr.CREATED_AT DESC
         """
         today_sit_ins = execute_query(today_query)
+
+        # Format duration for each sit-in
+        for sit_in in today_sit_ins:
+            if sit_in['duration_minutes'] is not None:
+                hours = sit_in['duration_minutes'] // 60
+                minutes = sit_in['duration_minutes'] % 60
+                sit_in['formatted_duration'] = f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
+            else:
+                sit_in['formatted_duration'] = 'N/A'
+
+            # Ensure time values are properly formatted
+            sit_in['formatted_time_in'] = sit_in['formatted_time_in'] if sit_in['formatted_time_in'] else 'N/A'
+            sit_in['formatted_time_out'] = sit_in['formatted_time_out'] if sit_in['formatted_time_out'] else 'N/A'
         
         return render_template('admin/sit_in.html', today_sit_ins=today_sit_ins)
     except Exception as e:
@@ -3262,3 +3284,194 @@ def delete_professor(professor_id):
     if result is not None:
         return jsonify({'message': 'Professor deleted successfully'})
     return jsonify({'error': 'Failed to delete professor'}), 500
+
+@admin_bp.route('/handle-reservation/<int:reservation_id>/<action>', methods=['POST'])
+@login_required
+@role_required('ADMIN')
+def handle_reservation(reservation_id, action):
+    try:
+        if action not in ['approve', 'deny']:
+            return jsonify({'error': 'Invalid action'}), 400
+            
+        status = 'APPROVED' if action == 'approve' else 'DENIED'
+        
+        # Get reservation details first
+        reservation = execute_query("""
+            SELECT r.*, u.COURSE, u.YEAR,
+                   COALESCE(sp.CURRENT_POINTS, 0) as current_points,
+                   COALESCE(sl.MAX_SIT_INS - sl.SIT_IN_COUNT, 0) as remaining_sessions
+            FROM RESERVATIONS r
+            JOIN USERS u ON r.USER_IDNO = u.IDNO
+            LEFT JOIN STUDENT_POINTS sp ON r.USER_IDNO = sp.USER_IDNO
+            LEFT JOIN SIT_IN_LIMITS sl ON r.USER_IDNO = sl.USER_IDNO
+            WHERE r.RESERVATION_ID = %s
+        """, (reservation_id,))
+        
+        if not reservation:
+            return jsonify({'error': 'Reservation not found'}), 404
+            
+        reservation = reservation[0]
+        
+        # Check if student has enough points/sessions before approving
+        if status == 'APPROVED':
+            if reservation.get('USE_POINTS'):
+                if reservation['current_points'] < 3:
+                    return jsonify({
+                        'error': 'Student does not have enough points for this reservation'
+                    }), 400
+            else:
+                if reservation['remaining_sessions'] <= 0:
+                    return jsonify({
+                        'error': 'Student does not have any remaining sit-in sessions'
+                    }), 400
+        
+        # Update reservation status
+        execute_query("""
+            UPDATE RESERVATIONS 
+            SET STATUS = %s 
+            WHERE RESERVATION_ID = %s
+        """, (status, reservation_id))
+        
+        if status == 'APPROVED':
+            # Check if the reservation time has already started
+            current_time = datetime.now()
+            reservation_datetime = datetime.combine(
+                reservation['RESERVATION_DATE'],
+                datetime.strptime(str(reservation['TIME_IN']), '%H:%M:%S').time()
+            )
+            
+            # Set initial sit-in status based on time
+            sit_in_status = 'APPROVED' if current_time >= reservation_datetime else 'PENDING'
+            sit_in_session = 'ON_GOING' if current_time >= reservation_datetime else 'PENDING'
+            
+            # Create sit-in record
+            sit_in_query = """
+            INSERT INTO SIT_IN_RECORDS (
+                USER_IDNO, LAB_ID, COMPUTER_ID, PURPOSE_ID,
+                DATE, TIME_IN, STATUS, SESSION, USE_POINTS
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            execute_query(sit_in_query, (
+                reservation['USER_IDNO'],
+                reservation['LAB_ID'],
+                reservation['COMPUTER_ID'],
+                reservation['PURPOSE_ID'],
+                reservation['RESERVATION_DATE'],
+                reservation['TIME_IN'],
+                sit_in_status,
+                sit_in_session,
+                reservation.get('USE_POINTS', False)
+            ))
+            
+            # Handle points or sit-in count immediately upon approval
+            if reservation.get('USE_POINTS'):
+                # Deduct points
+                execute_query("""
+                    UPDATE STUDENT_POINTS
+                    SET CURRENT_POINTS = CURRENT_POINTS - 3
+                    WHERE USER_IDNO = %s
+                """, (reservation['USER_IDNO'],))
+                
+                # Add to point history
+                execute_query("""
+                    INSERT INTO POINT_HISTORY (USER_IDNO, POINTS_CHANGE, REASON, ADDED_BY)
+                    VALUES (%s, -3, 'Points used for reservation', %s)
+                """, (reservation['USER_IDNO'], session['user_id']))
+            else:
+                # Increment sit-in count
+                execute_query("""
+                    UPDATE SIT_IN_LIMITS
+                    SET SIT_IN_COUNT = SIT_IN_COUNT + 1
+                    WHERE USER_IDNO = %s
+                """, (reservation['USER_IDNO'],))
+            
+            # If the sit-in is starting now, update computer status
+            if sit_in_session == 'ON_GOING':
+                execute_query("""
+                    UPDATE COMPUTERS
+                    SET STATUS = 'in_use'
+                    WHERE COMPUTER_ID = %s
+                """, (reservation['COMPUTER_ID'],))
+        
+        return jsonify({
+            'success': True,
+            'message': f'Reservation {status.lower()} successfully'
+        })
+        
+    except Exception as e:
+        print(f"Error in handle_reservation: {str(e)}")
+        return jsonify({'error': 'An error occurred while processing the reservation'}), 500
+
+@admin_bp.route('/reservations')
+@login_required
+@role_required('ADMIN')
+def manage_reservations():
+    try:
+        # Get filter parameters
+        status = request.args.get('status', 'all')
+        date = request.args.get('date')
+        lab_id = request.args.get('lab_id')
+        
+        # Build query conditions
+        conditions = []
+        params = []
+        
+        if status != 'all':
+            conditions.append("r.STATUS = %s")
+            params.append(status)
+            
+        if date:
+            conditions.append("r.RESERVATION_DATE = %s")
+            params.append(date)
+            
+        if lab_id:
+            conditions.append("r.LAB_ID = %s")
+            params.append(lab_id)
+            
+        # Build the WHERE clause
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        
+        # Get reservations with detailed information
+        query = f"""
+        SELECT 
+            r.*,
+            l.LAB_NAME,
+            p.PURPOSE_NAME,
+            c.COMPUTER_NUMBER,
+            u.FIRSTNAME,
+            u.LASTNAME,
+            u.COURSE,
+            u.YEAR,
+            DATE_FORMAT(r.CREATED_AT, '%Y-%m-%d %H:%i') as CREATED_TIME,
+            DATE_FORMAT(r.TIME_IN, '%h:%i %p') as FORMATTED_TIME
+        FROM RESERVATIONS r
+        JOIN LABORATORIES l ON r.LAB_ID = l.LAB_ID
+        JOIN PURPOSES p ON r.PURPOSE_ID = p.PURPOSE_ID
+        JOIN COMPUTERS c ON r.COMPUTER_ID = c.COMPUTER_ID
+        JOIN USERS u ON r.USER_IDNO = u.IDNO
+        WHERE {where_clause}
+        ORDER BY 
+            CASE 
+                WHEN r.STATUS = 'PENDING' THEN 1
+                WHEN r.STATUS = 'APPROVED' THEN 2
+                ELSE 3
+            END,
+            r.RESERVATION_DATE ASC,
+            r.TIME_IN ASC
+        """
+        reservations = execute_query(query, tuple(params))
+        
+        # Get labs for filter
+        labs = execute_query("SELECT * FROM LABORATORIES WHERE STATUS = 'active' ORDER BY LAB_NAME")
+        
+        return render_template('admin/reservations.html',
+                             reservations=reservations,
+                             labs=labs,
+                             current_status=status,
+                             current_date=date,
+                             current_lab=lab_id)
+                             
+    except Exception as e:
+        print(f"Error in manage_reservations: {str(e)}")
+        flash('An error occurred while loading reservations', 'error')
+        return redirect(url_for('admin.dashboard'))

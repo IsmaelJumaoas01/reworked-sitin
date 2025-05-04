@@ -1,50 +1,95 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container-fluid mt-4">
     <div class="card">
-        <div class="card-header">
-            <h4 class="mb-0">Pending Reservations</h4>
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">Manage Reservations</h4>
         </div>
         <div class="card-body">
+            <!-- Filters -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" id="statusFilter">
+                        <option value="all" {% if current_status == 'all' %}selected{% endif %}>All</option>
+                        <option value="PENDING" {% if current_status == 'PENDING' %}selected{% endif %}>Pending</option>
+                        <option value="APPROVED" {% if current_status == 'APPROVED' %}selected{% endif %}>Approved</option>
+                        <option value="DENIED" {% if current_status == 'DENIED' %}selected{% endif %}>Denied</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Laboratory</label>
+                    <select class="form-select" id="labFilter">
+                        <option value="">All Labs</option>
+                        {% for lab in labs %}
+                        <option value="{{ lab.LAB_ID }}" {% if current_lab == lab.LAB_ID|string %}selected{% endif %}>
+                            {{ lab.LAB_NAME }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Date</label>
+                    <input type="date" class="form-control" id="dateFilter" value="{{ current_date if current_date }}">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button class="btn btn-primary me-2" onclick="applyFilters()">
+                        <i class="fas fa-filter"></i> Apply Filters
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetFilters()">
+                        <i class="fas fa-undo"></i> Reset
+                    </button>
+                </div>
+            </div>
+
+            <!-- Reservations Table -->
             {% if reservations %}
             <div class="table-responsive">
-                <table class="table table-striped">
-                    <thead>
+                <table class="table table-hover">
+                    <thead class="table-light">
                         <tr>
-                            <th>ID Number</th>
-                            <th>Student Name</th>
+                            <th>Student</th>
+                            <th>Course & Year</th>
                             <th>Date</th>
                             <th>Time</th>
                             <th>Laboratory</th>
                             <th>Computer</th>
                             <th>Purpose</th>
-                            <th>Program</th>
+                            <th>Status</th>
+                            <th>Reserved On</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for reservation in reservations %}
                         <tr>
-                            <td>{{ reservation.USER_IDNO }}</td>
                             <td>{{ reservation.FIRSTNAME }} {{ reservation.LASTNAME }}</td>
+                            <td>{{ reservation.COURSE }} {{ reservation.YEAR }}</td>
                             <td>{{ reservation.RESERVATION_DATE }}</td>
-                            <td>{{ reservation.TIME_IN }} - {{ reservation.TIME_OUT }}</td>
+                            <td>{{ reservation.FORMATTED_TIME }}</td>
                             <td>{{ reservation.LAB_NAME }}</td>
-                            <td>PC {{ reservation.COMPUTER_ID }}</td>
+                            <td>PC {{ reservation.COMPUTER_NUMBER }}</td>
                             <td>{{ reservation.PURPOSE_NAME }}</td>
-                            <td>{{ reservation.PROGRAM }}</td>
                             <td>
+                                <span class="badge {% if reservation.STATUS == 'APPROVED' %}bg-success
+                                                  {% elif reservation.STATUS == 'DENIED' %}bg-danger
+                                                  {% else %}bg-warning{% endif %}">
+                                    {{ reservation.STATUS }}
+                                </span>
+                            </td>
+                            <td>{{ reservation.CREATED_TIME }}</td>
+                            <td>
+                                {% if reservation.STATUS == 'PENDING' %}
                                 <div class="btn-group">
-                                    <button class="btn btn-success btn-sm" 
-                                            onclick="handleReservation('{{ reservation.RESERVATION_ID }}', 'approve')">
-                                        Approve
+                                    <button class="btn btn-sm btn-success" onclick="handleReservation('{{ reservation.RESERVATION_ID }}', 'approve')" title="Approve">
+                                        <i class="fas fa-check"></i>
                                     </button>
-                                    <button class="btn btn-danger btn-sm" 
-                                            onclick="handleReservation('{{ reservation.RESERVATION_ID }}', 'deny')">
-                                        Deny
+                                    <button class="btn btn-sm btn-danger" onclick="handleReservation('{{ reservation.RESERVATION_ID }}', 'deny')" title="Deny">
+                                        <i class="fas fa-times"></i>
                                     </button>
                                 </div>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
@@ -52,8 +97,10 @@
                 </table>
             </div>
             {% else %}
-            <div class="alert alert-info">
-                No pending reservations found.
+            <div class="text-center py-5">
+                <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No Reservations Found</h5>
+                <p class="text-muted">No reservations match your current filters.</p>
             </div>
             {% endif %}
         </div>
@@ -61,12 +108,27 @@
 </div>
 
 <script>
-function handleReservation(reservationId, action) {
-    if (!confirm(`Are you sure you want to ${action} this reservation?`)) {
-        return;
-    }
+function applyFilters() {
+    const status = document.getElementById('statusFilter').value;
+    const labId = document.getElementById('labFilter').value;
+    const date = document.getElementById('dateFilter').value;
     
-    fetch(`/admin/reservation/${reservationId}/${action}`, {
+    let url = '{{ url_for("admin.manage_reservations") }}?';
+    if (status !== 'all') url += `status=${status}&`;
+    if (labId) url += `lab_id=${labId}&`;
+    if (date) url += `date=${date}&`;
+    
+    window.location.href = url.slice(0, -1); // Remove trailing & or ?
+}
+
+function resetFilters() {
+    window.location.href = '{{ url_for("admin.manage_reservations") }}';
+}
+
+function handleReservation(reservationId, action) {
+    if (!confirm(`Are you sure you want to ${action} this reservation?`)) return;
+    
+    fetch(`/admin/handle-reservation/${reservationId}/${action}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -74,16 +136,15 @@ function handleReservation(reservationId, action) {
     })
     .then(response => response.json())
     .then(data => {
-        if (data.error) {
-            alert(data.error);
-        } else {
-            alert(`Reservation ${action}d successfully!`);
+        if (data.success) {
             location.reload();
+        } else {
+            alert(data.message || 'An error occurred');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('An error occurred. Please try again.');
+        alert('An error occurred while processing your request');
     });
 }
 </script>

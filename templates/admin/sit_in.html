@@ -31,15 +31,9 @@
                             <td>{{ sit_in.FIRSTNAME }} {{ sit_in.LASTNAME }}</td>
                             <td>{{ sit_in.LAB_NAME }}</td>
                             <td>{{ sit_in.PURPOSE_NAME }}</td>
-                            <td>{{ sit_in.CREATED_AT.strftime('%I:%M %p') }}</td>
-                            <td>{{ sit_in.END_TIME.strftime('%I:%M %p') if sit_in.END_TIME else 'N/A' }}</td>
-                            <td>
-                                {% if sit_in.END_TIME %}
-                                    {{ ((sit_in.END_TIME - sit_in.CREATED_AT).total_seconds() / 60)|round|int }} minutes
-                                {% else %}
-                                    N/A
-                                {% endif %}
-                            </td>
+                            <td>{{ sit_in.formatted_time_in }}</td>
+                            <td>{{ sit_in.formatted_time_out }}</td>
+                            <td>{{ sit_in.formatted_duration }}</td>
                             <td>
                                 <span class="badge bg-success">Completed</span>
                             </td>

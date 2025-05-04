@@ -532,6 +532,8 @@ def inject_announcements():
         LIMIT 5
         """
         announcements = execute_query(announcement_query)
+        # Convert keys to lowercase
+        announcements = [{k.lower(): v for k, v in announcement.items()} for announcement in announcements]
         return {'announcements': announcements}
     except Exception as e:
         print(f"Error fetching announcements: {str(e)}")
@@ -550,15 +552,17 @@ def lab_schedules():
         purposes_query = "SELECT * FROM PURPOSES WHERE STATUS = 'active' ORDER BY PURPOSE_NAME"
         purposes = execute_query(purposes_query)
         
-        # Get all schedules
+        # Get all schedules with professor names
         schedules_query = """
             SELECT 
                 ls.*,
                 l.LAB_NAME,
-                p.PURPOSE_NAME
+                p.PURPOSE_NAME,
+                CONCAT(pr.LAST_NAME, ', ', pr.FIRST_NAME, ' ', COALESCE(pr.MIDDLE_NAME, '')) as PROFESSOR_NAME
             FROM LAB_SCHEDULES ls
             JOIN LABORATORIES l ON ls.LAB_ID = l.LAB_ID
             JOIN PURPOSES p ON ls.PURPOSE_ID = p.PURPOSE_ID
+            JOIN PROFESSORS pr ON ls.PROFESSOR_ID = pr.PROFESSOR_ID
             WHERE ls.STATUS = 'active'
             ORDER BY 
                 FIELD(ls.DAY_OF_WEEK, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'),

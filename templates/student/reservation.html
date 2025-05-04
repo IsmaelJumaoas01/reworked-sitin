@@ -4,12 +4,39 @@
 <div class="container mt-4">
     <div class="row">
         <div class="col-md-8 offset-md-2">
+            <!-- Points and Sessions Info Card -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-clock fa-2x text-primary me-2"></i>
+                                <div>
+                                    <h6 class="mb-0">Remaining Sessions</h6>
+                                    <h4 class="mb-0">{{ student_limits.remaining_sessions }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-star fa-2x text-warning me-2"></i>
+                                <div>
+                                    <h6 class="mb-0">Available Points</h6>
+                                    <h4 class="mb-0">{{ student_limits.current_points }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reservation Form Card -->
             <div class="card">
                 <div class="card-header">
                     <h4 class="mb-0">Make a Reservation</h4>
                 </div>
                 <div class="card-body">
-                    <form id="reservationForm" method="POST" action="{{ url_for('reservation.submit_reservation') }}">
+                    <form id="reservationForm" method="POST" action="{{ url_for('reservation.student_reservation') }}">
                         <div class="mb-3">
                             <label for="lab" class="form-label">Laboratory</label>
                             <select class="form-select" id="lab" name="lab_id" required>
@@ -42,28 +69,29 @@
                             <input type="date" class="form-control" id="date" name="date" required>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="time_in" class="form-label">Time In</label>
-                                    <input type="time" class="form-control" id="time_in" name="time_in" required>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="time_out" class="form-label">Time Out</label>
-                                    <input type="time" class="form-control" id="time_out" name="time_out" required>
-                                </div>
-                            </div>
+                        <div class="mb-3">
+                            <label for="time_in" class="form-label">Start Time</label>
+                            <select class="form-select" id="time_in" name="time_in" required disabled>
+                                <option value="">Select Time</option>
+                            </select>
                         </div>
 
                         <div class="mb-3">
-                            <label for="program" class="form-label">Program</label>
-                            <input type="text" class="form-control" id="program" name="program" required>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="usePoints" name="use_points" value="true"
+                                    {% if student_limits.remaining_sessions <= 0 and student_limits.current_points >= 3 %}checked{% endif %}
+                                    {% if student_limits.current_points < 3 %}disabled{% endif %}>
+                                <label class="form-check-label" for="usePoints">
+                                    Use points instead (3 points required)
+                                </label>
+                            </div>
                         </div>
 
                         <div class="text-end">
-                            <button type="submit" class="btn btn-primary">Submit Reservation</button>
+                            <button type="submit" class="btn btn-primary" 
+                                {% if student_limits.remaining_sessions <= 0 and student_limits.current_points < 3 %}disabled{% endif %}>
+                                Submit Reservation
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -76,12 +104,46 @@
 document.addEventListener('DOMContentLoaded', function() {
     const labSelect = document.getElementById('lab');
     const computerSelect = document.getElementById('computer');
+    const dateInput = document.getElementById('date');
+    const timeSelect = document.getElementById('time_in');
+    const usePointsCheckbox = document.getElementById('usePoints');
+    const submitButton = document.querySelector('button[type="submit"]');
+    
+    // Set minimum date to today
+    const today = new Date().toISOString().split('T')[0];
+    dateInput.min = today;
+    
+    // Get student limits from data attributes
+    const remainingSessions = parseInt("{{ student_limits.remaining_sessions }}");
+    const currentPoints = parseInt("{{ student_limits.current_points }}");
+    
+    // Update submit button state based on points/sessions
+    function updateSubmitButtonState() {
+        const usePoints = usePointsCheckbox.checked;
+        
+        if (usePoints && currentPoints < 3) {
+            submitButton.disabled = true;
+            submitButton.title = 'Not enough points';
+        } else if (!usePoints && remainingSessions <= 0) {
+            submitButton.disabled = true;
+            submitButton.title = 'No remaining sessions';
+        } else {
+            submitButton.disabled = false;
+            submitButton.title = '';
+        }
+    }
+    
+    usePointsCheckbox.addEventListener('change', updateSubmitButtonState);
     
     // Update available computers when lab is selected
     labSelect.addEventListener('change', function() {
         const labId = this.value;
-        computerSelect.disabled = true; // Disable while loading
+        computerSelect.disabled = true;
         computerSelect.innerHTML = '<option value="">Loading computers...</option>';
+        
+        // Reset and disable time select when lab changes
+        timeSelect.disabled = true;
+        timeSelect.innerHTML = '<option value="">Select Time</option>';
         
         if (labId) {
             fetch(`/api/computers/${labId}`)
@@ -114,31 +176,52 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Form submission
-    const form = document.getElementById('reservationForm');
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const formData = new FormData(form);
-        fetch(form.action, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                alert(data.error);
-            } else {
-                alert('Reservation submitted successfully!');
-                form.reset();
-                computerSelect.disabled = true;
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred. Please try again.');
-        });
-    });
+    // Update available time slots when date or lab changes
+    function updateAvailableTimeSlots() {
+        const labId = labSelect.value;
+        const date = dateInput.value;
+
+        if (!labId || !date) {
+            timeSelect.disabled = true;
+            timeSelect.innerHTML = '<option value="">Select Time</option>';
+            return;
+        }
+
+        timeSelect.disabled = true;
+        timeSelect.innerHTML = '<option value="">Loading time slots...</option>';
+
+        fetch(`/api/available-slots?lab_id=${labId}&date=${date}`)
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.message || 'Failed to load time slots');
+                }
+
+                timeSelect.innerHTML = '<option value="">Select Time</option>';
+                if (data.available_slots.length === 0) {
+                    timeSelect.innerHTML = '<option value="">No available time slots</option>';
+                } else {
+                    data.available_slots.forEach(slot => {
+                        const option = document.createElement('option');
+                        option.value = slot.time;
+                        option.textContent = slot.formatted_time;
+                        timeSelect.appendChild(option);
+                    });
+                    timeSelect.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                timeSelect.innerHTML = '<option value="">Error loading time slots</option>';
+            });
+    }
+
+    // Add event listeners for date and lab changes
+    dateInput.addEventListener('change', updateAvailableTimeSlots);
+    labSelect.addEventListener('change', updateAvailableTimeSlots);
+    
+    // Initialize submit button state
+    updateSubmitButtonState();
 });
 </script>
 {% endblock %} 
