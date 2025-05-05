@@ -39,6 +39,15 @@
                             </select>
                         </div>
                         <div class="col-md-3">
+                            <label for="statusFilter" class="form-label">Filter by Status</label>
+                            <select class="form-select" id="statusFilter" name="status">
+                                <option value="">All Status</option>
+                                <option value="PENDING" {% if request.args.get('status') == 'PENDING' %}selected{% endif %}>Sit-in Reserved</option>
+                                <option value="ON_GOING" {% if request.args.get('status') == 'ON_GOING' %}selected{% endif %}>On Going</option>
+                                <option value="COMPLETED" {% if request.args.get('status') == 'COMPLETED' %}selected{% endif %}>Completed</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
                             <label for="startDate" class="form-label">Start Date</label>
                             <input type="date" class="form-control" id="startDate" name="start_date">
                         </div>
@@ -119,8 +128,16 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <span class="badge bg-{{ 'success' if record.SESSION == 'ON_GOING' else 'secondary' }}">
-                                            {{ record.SESSION|title }}
+                                        <span class="badge bg-{{ 'success' if record.SESSION == 'ON_GOING' else 'secondary' if record.SESSION == 'COMPLETED' else 'info' }}">
+                                            {% if record.SESSION == 'PENDING' %}
+                                                Sit-in Reserved
+                                            {% elif record.SESSION == 'ON_GOING' %}
+                                                On Going
+                                            {% elif record.SESSION == 'COMPLETED' %}
+                                                Completed
+                                            {% else %}
+                                                {{ record.SESSION|title }}
+                                            {% endif %}
                                         </span>
                                     </td>
                                 </tr>
@@ -134,17 +151,17 @@
                     <nav aria-label="Page navigation" class="mt-4">
                         <ul class="pagination justify-content-center">
                             <li class="page-item {{ 'disabled' if current_page == 1 }}">
-                                <a class="page-link" href="{{ url_for('admin.sit_in_records', page=current_page-1, lab_id=selected_lab, purpose_id=selected_purpose) if current_page > 1 else '#' }}">Previous</a>
+                                <a class="page-link" href="{{ url_for('admin.sit_in_records', page=current_page-1, lab_id=request.args.get('lab_id'), purpose_id=request.args.get('purpose_id'), status=request.args.get('status'), start_date=request.args.get('start_date'), end_date=request.args.get('end_date')) if current_page > 1 else '#' }}">Previous</a>
                             </li>
                             
                             {% for page in range(1, total_pages + 1) %}
                             <li class="page-item {{ 'active' if page == current_page }}">
-                                <a class="page-link" href="{{ url_for('admin.sit_in_records', page=page, lab_id=selected_lab, purpose_id=selected_purpose) }}">{{ page }}</a>
+                                <a class="page-link" href="{{ url_for('admin.sit_in_records', page=page, lab_id=request.args.get('lab_id'), purpose_id=request.args.get('purpose_id'), status=request.args.get('status'), start_date=request.args.get('start_date'), end_date=request.args.get('end_date')) }}">{{ page }}</a>
                             </li>
                             {% endfor %}
                             
                             <li class="page-item {{ 'disabled' if current_page == total_pages }}">
-                                <a class="page-link" href="{{ url_for('admin.sit_in_records', page=current_page+1, lab_id=selected_lab, purpose_id=selected_purpose) if current_page < total_pages else '#' }}">Next</a>
+                                <a class="page-link" href="{{ url_for('admin.sit_in_records', page=current_page+1, lab_id=request.args.get('lab_id'), purpose_id=request.args.get('purpose_id'), status=request.args.get('status'), start_date=request.args.get('start_date'), end_date=request.args.get('end_date')) if current_page < total_pages else '#' }}">Next</a>
                             </li>
                         </ul>
                     </nav>

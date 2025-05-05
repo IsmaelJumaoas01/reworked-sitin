@@ -152,7 +152,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
    - ID: 20230002
    - Email: bob.w@example.com
    - Password: student123
-   - Course: BSCS
+   - Course: BSIT
    - Year: 2
    - Sit-in Limit: 30
 
@@ -176,9 +176,89 @@ This project is licensed under the MIT License - see the LICENSE file for detail
    - ID: 20230005
    - Email: eve.d@example.com
    - Password: student123
-   - Course: BSIT
+   - Course: BSCS
    - Year: 2
    - Sit-in Limit: 30
+
+6. Frank Wilson
+   - ID: 20230006
+   - Email: frank.w@example.com
+   - Password: student123
+   - Course: BSA
+   - Year: 3
+   - Sit-in Limit: 15
+
+7. Grace Taylor
+   - ID: 20230007
+   - Email: grace.t@example.com
+   - Password: student123
+   - Course: BSA
+   - Year: 4
+   - Sit-in Limit: 15
+
+8. Henry Anderson
+   - ID: 20230008
+   - Email: henry.a@example.com
+   - Password: student123
+   - Course: BSCE
+   - Year: 2
+   - Sit-in Limit: 15
+
+9. Ivy Martinez
+   - ID: 20230009
+   - Email: ivy.m@example.com
+   - Password: student123
+   - Course: BSCE
+   - Year: 3
+   - Sit-in Limit: 15
+
+10. Jack Robinson
+    - ID: 20230010
+    - Email: jack.r@example.com
+    - Password: student123
+    - Course: BSEE
+    - Year: 1
+    - Sit-in Limit: 15
+
+11. Kelly Clark
+    - ID: 20230011
+    - Email: kelly.c@example.com
+    - Password: student123
+    - Course: BSEE
+    - Year: 4
+    - Sit-in Limit: 15
+
+12. Liam Rodriguez
+    - ID: 20230012
+    - Email: liam.r@example.com
+    - Password: student123
+    - Course: BSCHE
+    - Year: 2
+    - Sit-in Limit: 15
+
+13. Mia Lewis
+    - ID: 20230013
+    - Email: mia.l@example.com
+    - Password: student123
+    - Course: BSCHE
+    - Year: 3
+    - Sit-in Limit: 15
+
+14. Noah Lee
+    - ID: 20230014
+    - Email: noah.l@example.com
+    - Password: student123
+    - Course: BSCHEM
+    - Year: 1
+    - Sit-in Limit: 15
+
+15. Olivia Walker
+    - ID: 20230015
+    - Email: olivia.w@example.com
+    - Password: student123
+    - Course: BSCHEM
+    - Year: 4
+    - Sit-in Limit: 15
 
 ### Default Announcements
 1. Welcome to the New Semester

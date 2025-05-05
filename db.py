@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 import hashlib
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 
 # Load environment variables
@@ -141,14 +141,37 @@ def insert_default_data():
             """, staff[:4] + (hashed_password,) + staff[5:])
         print(f"Inserted {len(staff_users)} staff users")
         
-        # Insert default student users
+        # Insert default student users with diverse courses
         print("\nInserting student users...")
         student_users = [
+            # BSIT Students (30 max sit-ins)
             ('20230001', 'Alice', 'Johnson', 'alice.j@example.com', 'student123', 'BSIT', 3, 'STUDENT'),
-            ('20230002', 'Bob', 'Williams', 'bob.w@example.com', 'student123', 'BSCS', 2, 'STUDENT'),
+            ('20230002', 'Bob', 'Williams', 'bob.w@example.com', 'student123', 'BSIT', 2, 'STUDENT'),
             ('20230003', 'Carol', 'Brown', 'carol.b@example.com', 'student123', 'BSIT', 4, 'STUDENT'),
+            
+            # BSCS Students (30 max sit-ins)
             ('20230004', 'David', 'Miller', 'david.m@example.com', 'student123', 'BSCS', 1, 'STUDENT'),
-            ('20230005', 'Eve', 'Davis', 'eve.d@example.com', 'student123', 'BSIT', 2, 'STUDENT')
+            ('20230005', 'Eve', 'Davis', 'eve.d@example.com', 'student123', 'BSCS', 2, 'STUDENT'),
+            
+            # BSA Students (15 max sit-ins)
+            ('20230006', 'Frank', 'Wilson', 'frank.w@example.com', 'student123', 'BSA', 3, 'STUDENT'),
+            ('20230007', 'Grace', 'Taylor', 'grace.t@example.com', 'student123', 'BSA', 4, 'STUDENT'),
+            
+            # BSCE Students (15 max sit-ins)
+            ('20230008', 'Henry', 'Anderson', 'henry.a@example.com', 'student123', 'BSCE', 2, 'STUDENT'),
+            ('20230009', 'Ivy', 'Martinez', 'ivy.m@example.com', 'student123', 'BSCE', 3, 'STUDENT'),
+            
+            # BSEE Students (15 max sit-ins)
+            ('20230010', 'Jack', 'Robinson', 'jack.r@example.com', 'student123', 'BSEE', 1, 'STUDENT'),
+            ('20230011', 'Kelly', 'Clark', 'kelly.c@example.com', 'student123', 'BSEE', 4, 'STUDENT'),
+            
+            # BSCHE Students (15 max sit-ins)
+            ('20230012', 'Liam', 'Rodriguez', 'liam.r@example.com', 'student123', 'BSCHE', 2, 'STUDENT'),
+            ('20230013', 'Mia', 'Lewis', 'mia.l@example.com', 'student123', 'BSCHE', 3, 'STUDENT'),
+            
+            # BSCHEM Students (15 max sit-ins)
+            ('20230014', 'Noah', 'Lee', 'noah.l@example.com', 'student123', 'BSCHEM', 1, 'STUDENT'),
+            ('20230015', 'Olivia', 'Walker', 'olivia.w@example.com', 'student123', 'BSCHEM', 4, 'STUDENT')
         ]
         
         for student in student_users:
@@ -158,13 +181,13 @@ def insert_default_data():
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'active')
             """, student[:4] + (hashed_password,) + student[5:])
             
-            # Set sit-in limits for students
+            # Set sit-in limits for students based on their course
             max_sit_ins = 30 if student[5] in ['BSIT', 'BSCS'] else 15
             execute_query("""
                 INSERT INTO SIT_IN_LIMITS (USER_IDNO, SIT_IN_COUNT, MAX_SIT_INS)
                 VALUES (%s, 0, %s)
             """, (student[0], max_sit_ins))
-        print(f"Inserted {len(student_users)} student users")
+        print(f"Inserted {len(student_users)} student users with appropriate sit-in limits")
         
         # Insert default announcements
         print("\nInserting announcements...")
@@ -269,6 +292,263 @@ def insert_default_data():
         print("\nDefault data inserted successfully!")
     except Exception as e:
         print(f"\nError inserting default data: {str(e)}")
+        raise e
+
+def insert_sample_sit_in_records():
+    try:
+        print("\n=== Checking for Sample Data ===")
+        
+        # Check if any sample data exists
+        check_query = """
+        SELECT 
+            (SELECT COUNT(*) FROM SIT_IN_RECORDS) as sit_in_count,
+            (SELECT COUNT(*) FROM FEEDBACKS) as feedback_count,
+            (SELECT COUNT(*) FROM RESERVATIONS) as reservation_count
+        """
+        result = execute_query(check_query)
+        
+        if result and (result[0]['sit_in_count'] > 0 or result[0]['feedback_count'] > 0 or result[0]['reservation_count'] > 0):
+            print("Sample data already exists. Skipping insertion.")
+            return
+            
+        print("No sample data found. Inserting sample records...")
+        
+        # First, get some sample data from existing tables
+        users_query = "SELECT IDNO FROM USERS WHERE USER_TYPE = 'STUDENT' LIMIT 5"
+        labs_query = "SELECT LAB_ID FROM LABORATORIES WHERE STATUS = 'active' LIMIT 3"
+        purposes_query = "SELECT PURPOSE_ID FROM PURPOSES WHERE STATUS = 'active'"
+        computers_query = "SELECT COMPUTER_ID FROM COMPUTERS WHERE STATUS = 'available' LIMIT 5"
+        
+        users = execute_query(users_query)
+        labs = execute_query(labs_query)
+        purposes = execute_query(purposes_query)
+        computers = execute_query(computers_query)
+        
+        if not all([users, labs, purposes, computers]):
+            print("Error: Could not get required sample data")
+            return
+        
+        # Define time slots (1-hour intervals)
+        time_slots = [
+            ('07:30:00', '08:30:00'),
+            ('08:30:00', '09:30:00'),
+            ('09:30:00', '10:30:00'),
+            ('10:30:00', '11:30:00'),
+            ('11:30:00', '12:30:00'),
+            ('13:00:00', '14:00:00'),
+            ('14:00:00', '15:00:00'),
+            ('15:00:00', '16:00:00'),
+            ('16:00:00', '17:00:00'),
+            ('17:00:00', '18:00:00'),
+            ('18:00:00', '19:00:00'),
+            ('19:00:00', '20:00:00'),
+            ('20:00:00', '21:00:00')
+        ]
+        
+        # Generate dates for the last 7 days and next 7 days
+        past_dates = [(datetime.now() - timedelta(days=i)).date() for i in range(7)]
+        future_dates = [(datetime.now() + timedelta(days=i)).date() for i in range(1, 8)]
+        
+        # Insert sit-in records and feedbacks for past dates
+        for date in past_dates:
+            for user in users:
+                # Randomly select lab, purpose, and computer
+                lab = random.choice(labs)
+                purpose = random.choice(purposes)
+                computer = random.choice(computers)
+                
+                # Randomly select time slot
+                time_slot = random.choice(time_slots)
+                time_in = time_slot[0]
+                time_out = time_slot[1]
+                
+                # Check if student points record exists, if not create it
+                points_check = execute_query("SELECT POINT_ID FROM STUDENT_POINTS WHERE USER_IDNO = %s", (user['IDNO'],))
+                if not points_check:
+                    execute_query("""
+                        INSERT INTO STUDENT_POINTS (USER_IDNO, CURRENT_POINTS, TOTAL_POINTS)
+                        VALUES (%s, 0, 0)
+                    """, (user['IDNO'],))
+                
+                # Insert sit-in record
+                sit_in_query = """
+                INSERT INTO SIT_IN_RECORDS (
+                    USER_IDNO, LAB_ID, COMPUTER_ID, PURPOSE_ID,
+                    DATE, TIME_IN, TIME_OUT, STATUS, SESSION,
+                    USE_POINTS, CREATED_AT
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, 'COMPLETED', 'COMPLETED',
+                    FALSE, %s)
+                """
+                created_at = datetime.combine(date, datetime.strptime(time_in, '%H:%M:%S').time())
+                execute_query(sit_in_query, (
+                    user['IDNO'],
+                    lab['LAB_ID'],
+                    computer['COMPUTER_ID'],
+                    purpose['PURPOSE_ID'],
+                    date,
+                    time_in,
+                    time_out,
+                    created_at
+                ))
+                
+                # Get the inserted record ID
+                record_query = """
+                SELECT RECORD_ID FROM SIT_IN_RECORDS 
+                WHERE USER_IDNO = %s AND DATE = %s AND TIME_IN = %s
+                ORDER BY CREATED_AT DESC LIMIT 1
+                """
+                record = execute_query(record_query, (user['IDNO'], date, time_in))
+                
+                if record:
+                    # Insert feedback for this sit-in record
+                    feedback_query = """
+                    INSERT INTO FEEDBACKS (
+                        RECORD_ID, USER_IDNO, RATING, COMMENT
+                    ) VALUES (%s, %s, %s, %s)
+                    """
+                    rating = random.randint(1, 5)
+                    comments = [
+                        "Great experience!",
+                        "The lab was well-maintained.",
+                        "Good facilities.",
+                        "Could use some improvements.",
+                        "Excellent service!"
+                    ]
+                    execute_query(feedback_query, (
+                        record[0]['RECORD_ID'],
+                        user['IDNO'],
+                        rating,
+                        random.choice(comments)
+                    ))
+                    
+                    # Update computer status
+                    update_computer_query = """
+                    UPDATE COMPUTERS
+                    SET STATUS = 'available'
+                    WHERE COMPUTER_ID = %s
+                    """
+                    execute_query(update_computer_query, (computer['COMPUTER_ID'],))
+                    
+                    # Update sit-in count for student
+                    update_count_query = """
+                    UPDATE SIT_IN_LIMITS 
+                    SET SIT_IN_COUNT = SIT_IN_COUNT + 1 
+                    WHERE USER_IDNO = %s
+                    """
+                    execute_query(update_count_query, (user['IDNO'],))
+                    
+                    # Add points for completed session
+                    points_query = """
+                    UPDATE STUDENT_POINTS 
+                    SET CURRENT_POINTS = CURRENT_POINTS + 1,
+                        TOTAL_POINTS = TOTAL_POINTS + 1
+                    WHERE USER_IDNO = %s
+                    """
+                    execute_query(points_query, (user['IDNO'],))
+                    
+                    # Add to point history
+                    history_query = """
+                    INSERT INTO POINT_HISTORY (USER_IDNO, POINTS_CHANGE, REASON, ADDED_BY)
+                    VALUES (%s, 1, 'Completed sit-in session', %s)
+                    """
+                    execute_query(history_query, (user['IDNO'], user['IDNO']))
+        
+        # Insert sample reservations for future dates
+        print("\n=== Inserting Sample Reservations ===")
+        for date in future_dates:
+            for user in users:
+                # Randomly select lab, purpose, and computer
+                lab = random.choice(labs)
+                purpose = random.choice(purposes)
+                computer = random.choice(computers)
+                
+                # Randomly select time slot
+                time_slot = random.choice(time_slots)
+                time_in = time_slot[0]
+                
+                # Randomly decide if this will be a pending or approved reservation
+                status = random.choice(['PENDING', 'APPROVED'])
+                use_points = random.choice([True, False])
+                
+                # Check if student has enough points if using points
+                if use_points:
+                    points_check = execute_query("""
+                        SELECT CURRENT_POINTS 
+                        FROM STUDENT_POINTS 
+                        WHERE USER_IDNO = %s AND CURRENT_POINTS >= 3
+                    """, (user['IDNO'],))
+                    if not points_check:
+                        use_points = False
+                
+                # Insert reservation
+                reservation_query = """
+                INSERT INTO RESERVATIONS (
+                    USER_IDNO, LAB_ID, COMPUTER_ID, PURPOSE_ID,
+                    RESERVATION_DATE, TIME_IN, STATUS, USE_POINTS,
+                    CREATED_AT
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                created_at = datetime.combine(date, datetime.strptime(time_in, '%H:%M:%S').time())
+                execute_query(reservation_query, (
+                    user['IDNO'],
+                    lab['LAB_ID'],
+                    computer['COMPUTER_ID'],
+                    purpose['PURPOSE_ID'],
+                    date,
+                    time_in,
+                    status,
+                    use_points,
+                    created_at
+                ))
+                
+                # If reservation is approved, create corresponding sit-in record
+                if status == 'APPROVED':
+                    sit_in_query = """
+                    INSERT INTO SIT_IN_RECORDS (
+                        USER_IDNO, LAB_ID, COMPUTER_ID, PURPOSE_ID,
+                        DATE, TIME_IN, STATUS, SESSION, USE_POINTS,
+                        CREATED_AT
+                    ) VALUES (%s, %s, %s, %s, %s, %s, 'PENDING', 'PENDING',
+                        %s, %s)
+                    """
+                    execute_query(sit_in_query, (
+                        user['IDNO'],
+                        lab['LAB_ID'],
+                        computer['COMPUTER_ID'],
+                        purpose['PURPOSE_ID'],
+                        date,
+                        time_in,
+                        use_points,
+                        created_at
+                    ))
+                    
+                    # If using points, deduct them
+                    if use_points:
+                        points_query = """
+                        UPDATE STUDENT_POINTS 
+                        SET CURRENT_POINTS = CURRENT_POINTS - 3
+                        WHERE USER_IDNO = %s
+                        """
+                        execute_query(points_query, (user['IDNO'],))
+                        
+                        # Add to point history
+                        history_query = """
+                        INSERT INTO POINT_HISTORY (USER_IDNO, POINTS_CHANGE, REASON, ADDED_BY)
+                        VALUES (%s, -3, 'Points used for reservation', %s)
+                        """
+                        execute_query(history_query, (user['IDNO'], user['IDNO']))
+                    else:
+                        # Increment sit-in count
+                        update_count_query = """
+                        UPDATE SIT_IN_LIMITS 
+                        SET SIT_IN_COUNT = SIT_IN_COUNT + 1 
+                        WHERE USER_IDNO = %s
+                        """
+                        execute_query(update_count_query, (user['IDNO'],))
+        
+        print("Sample sit-in records, feedbacks, and reservations inserted successfully!")
+    except Exception as e:
+        print(f"Error inserting sample data: {str(e)}")
         raise e
 
 def init_db():
@@ -377,6 +657,26 @@ def init_db():
             )
         """)
         
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS RESERVATIONS (
+                RESERVATION_ID INT AUTO_INCREMENT PRIMARY KEY,
+                USER_IDNO VARCHAR(20) NOT NULL,
+                LAB_ID INT NOT NULL,
+                COMPUTER_ID INT NOT NULL,
+                PURPOSE_ID INT NOT NULL,
+                RESERVATION_DATE DATE NOT NULL,
+                TIME_IN TIME NOT NULL,
+                STATUS ENUM('PENDING', 'APPROVED', 'DENIED') DEFAULT 'PENDING',
+                USE_POINTS BOOLEAN DEFAULT FALSE,
+                CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UPDATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (USER_IDNO) REFERENCES USERS(IDNO),
+                FOREIGN KEY (LAB_ID) REFERENCES LABORATORIES(LAB_ID),
+                FOREIGN KEY (COMPUTER_ID) REFERENCES COMPUTERS(COMPUTER_ID),
+                FOREIGN KEY (PURPOSE_ID) REFERENCES PURPOSES(PURPOSE_ID)
+            )
+        """)
+        
         # Add points system tables
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS STUDENT_POINTS (
@@ -477,6 +777,9 @@ def init_db():
         
         # Insert default data
         insert_default_data()
+        
+        # Insert sample sit-in records and feedbacks
+        insert_sample_sit_in_records()
         
         # Initialize lab schedules if none exist
         cursor.execute("SELECT COUNT(*) as count FROM LAB_SCHEDULES")
@@ -586,38 +889,6 @@ def init_db():
                         if total_hours_scheduled >= max_hours_per_day:
                             break
         
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS RESERVATIONS (
-                RESERVATION_ID INT AUTO_INCREMENT PRIMARY KEY,
-                USER_IDNO VARCHAR(20) NOT NULL,
-                LAB_ID INT NOT NULL,
-                COMPUTER_ID INT NOT NULL,
-                PURPOSE_ID INT NOT NULL,
-                RESERVATION_DATE DATE NOT NULL,
-                TIME_IN TIME NOT NULL,
-                STATUS ENUM('PENDING', 'APPROVED', 'DENIED') DEFAULT 'PENDING',
-                USE_POINTS BOOLEAN DEFAULT FALSE,
-                CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UPDATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                FOREIGN KEY (USER_IDNO) REFERENCES USERS(IDNO),
-                FOREIGN KEY (LAB_ID) REFERENCES LABORATORIES(LAB_ID),
-                FOREIGN KEY (COMPUTER_ID) REFERENCES COMPUTERS(COMPUTER_ID),
-                FOREIGN KEY (PURPOSE_ID) REFERENCES PURPOSES(PURPOSE_ID)
-            )
-        """)
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS PROFESSORS (
-                PROFESSOR_ID INT AUTO_INCREMENT PRIMARY KEY,
-                FIRST_NAME VARCHAR(50) NOT NULL,
-                LAST_NAME VARCHAR(50) NOT NULL,
-                MIDDLE_NAME VARCHAR(50),
-                STATUS ENUM('active', 'inactive') DEFAULT 'active',
-                CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UPDATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            )
-        """)
-
         # Insert default professors
         cursor.execute("SELECT COUNT(*) as count FROM PROFESSORS")
         if cursor.fetchone()['count'] == 0:

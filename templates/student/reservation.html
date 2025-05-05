@@ -69,7 +69,7 @@
                             <input type="date" class="form-control" id="date" name="date" required>
                         </div>
 
-                        <div class="mb-3">
+                                <div class="mb-3">
                             <label for="time_in" class="form-label">Start Time</label>
                             <select class="form-select" id="time_in" name="time_in" required disabled>
                                 <option value="">Select Time</option>
@@ -191,8 +191,8 @@ document.addEventListener('DOMContentLoaded', function() {
         timeSelect.innerHTML = '<option value="">Loading time slots...</option>';
 
         fetch(`/api/available-slots?lab_id=${labId}&date=${date}`)
-            .then(response => response.json())
-            .then(data => {
+        .then(response => response.json())
+        .then(data => {
                 if (!data.success) {
                     throw new Error(data.message || 'Failed to load time slots');
                 }
@@ -200,7 +200,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 timeSelect.innerHTML = '<option value="">Select Time</option>';
                 if (data.available_slots.length === 0) {
                     timeSelect.innerHTML = '<option value="">No available time slots</option>';
-                } else {
+            } else {
                     data.available_slots.forEach(slot => {
                         const option = document.createElement('option');
                         option.value = slot.time;
@@ -208,12 +208,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         timeSelect.appendChild(option);
                     });
                     timeSelect.disabled = false;
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
                 timeSelect.innerHTML = '<option value="">Error loading time slots</option>';
-            });
+        });
     }
 
     // Add event listeners for date and lab changes

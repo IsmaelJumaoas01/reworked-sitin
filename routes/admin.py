@@ -1306,6 +1306,7 @@ def sit_in_records():
     per_page = 10
     lab_id = request.args.get('lab_id', type=int)
     purpose_id = request.args.get('purpose_id', type=int)
+    status = request.args.get('status')
     
     # Build the base query
     base_query = """
@@ -1332,6 +1333,9 @@ def sit_in_records():
     if purpose_id:
         base_query += " AND sr.PURPOSE_ID = %s"
         params.append(purpose_id)
+    if status:
+        base_query += " AND sr.SESSION = %s"
+        params.append(status)
     
     # Get total count with filters
     count_query = f"SELECT COUNT(*) as total FROM ({base_query}) as filtered"
@@ -3206,11 +3210,14 @@ def update_resource(resource_id):
         print(f"Error updating resource: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@admin_bp.route('/professors', methods=['GET'])
-def professors():
-    if 'user_id' not in session or session.get('user_type') not in ['ADMIN', 'STAFF']:
+@admin_bp.route('/professors')
+@login_required
+@role_required('ADMIN')
+def manage_professors():
+    if session.get('user_type') not in ['ADMIN', 'STAFF']:
         return redirect(url_for('auth.login'))
     
+    # Get all professors
     professors = execute_query("""
         SELECT * FROM PROFESSORS 
         ORDER BY LAST_NAME, FIRST_NAME
@@ -3219,71 +3226,87 @@ def professors():
     return render_template('admin/professors.html', professors=professors)
 
 @admin_bp.route('/professors/add', methods=['POST'])
+@login_required
+@role_required('ADMIN')
 def add_professor():
-    if 'user_id' not in session or session.get('user_type') not in ['ADMIN', 'STAFF']:
-        return jsonify({'error': 'Unauthorized'}), 401
+    if session.get('user_type') not in ['ADMIN', 'STAFF']:
+        return jsonify({'success': False, 'message': 'Unauthorized access'})
     
-    data = request.json
-    first_name = data.get('first_name')
-    last_name = data.get('last_name')
-    middle_name = data.get('middle_name', '')
-    
-    if not first_name or not last_name:
-        return jsonify({'error': 'First name and last name are required'}), 400
-    
-    result = execute_query("""
-        INSERT INTO PROFESSORS (FIRST_NAME, LAST_NAME, MIDDLE_NAME)
-        VALUES (%s, %s, %s)
-    """, (first_name, last_name, middle_name))
-    
-    if result:
-        return jsonify({'message': 'Professor added successfully'})
-    return jsonify({'error': 'Failed to add professor'}), 500
+    try:
+        first_name = request.form.get('first_name')
+        last_name = request.form.get('last_name')
+        middle_name = request.form.get('middle_name', '')
+        
+        if not first_name or not last_name:
+            return jsonify({'success': False, 'message': 'First name and last name are required'})
+        
+        # Insert new professor
+        execute_query("""
+            INSERT INTO PROFESSORS (FIRST_NAME, LAST_NAME, MIDDLE_NAME, STATUS)
+            VALUES (%s, %s, %s, 'active')
+        """, (first_name, last_name, middle_name))
+        
+        return jsonify({'success': True, 'message': 'Professor added successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
 
-@admin_bp.route('/professors/<int:professor_id>', methods=['PUT'])
-def update_professor(professor_id):
-    if 'user_id' not in session or session.get('user_type') not in ['ADMIN', 'STAFF']:
-        return jsonify({'error': 'Unauthorized'}), 401
+@admin_bp.route('/professors/edit/<int:professor_id>', methods=['POST'])
+@login_required
+@role_required('ADMIN')
+def edit_professor(professor_id):
+    if session.get('user_type') not in ['ADMIN', 'STAFF']:
+        return jsonify({'success': False, 'message': 'Unauthorized access'})
     
-    data = request.json
-    first_name = data.get('first_name')
-    last_name = data.get('last_name')
-    middle_name = data.get('middle_name', '')
-    status = data.get('status', 'active')
-    
-    if not first_name or not last_name:
-        return jsonify({'error': 'First name and last name are required'}), 400
-    
-    result = execute_query("""
-        UPDATE PROFESSORS 
-        SET FIRST_NAME = %s, LAST_NAME = %s, MIDDLE_NAME = %s, STATUS = %s
-        WHERE PROFESSOR_ID = %s
-    """, (first_name, last_name, middle_name, status, professor_id))
-    
-    if result is not None:
-        return jsonify({'message': 'Professor updated successfully'})
-    return jsonify({'error': 'Failed to update professor'}), 500
+    try:
+        first_name = request.form.get('first_name')
+        last_name = request.form.get('last_name')
+        middle_name = request.form.get('middle_name', '')
+        status = request.form.get('status', 'active')
+        
+        if not first_name or not last_name:
+            return jsonify({'success': False, 'message': 'First name and last name are required'})
+        
+        # Update professor
+        execute_query("""
+            UPDATE PROFESSORS 
+            SET FIRST_NAME = %s, LAST_NAME = %s, MIDDLE_NAME = %s, STATUS = %s
+            WHERE PROFESSOR_ID = %s
+        """, (first_name, last_name, middle_name, status, professor_id))
+        
+        return jsonify({'success': True, 'message': 'Professor updated successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
 
-@admin_bp.route('/professors/<int:professor_id>', methods=['DELETE'])
+@admin_bp.route('/professors/delete/<int:professor_id>', methods=['POST'])
+@login_required
+@role_required('ADMIN')
 def delete_professor(professor_id):
-    if 'user_id' not in session or session.get('user_type') not in ['ADMIN', 'STAFF']:
-        return jsonify({'error': 'Unauthorized'}), 401
+    if session.get('user_type') not in ['ADMIN', 'STAFF']:
+        return jsonify({'success': False, 'message': 'Unauthorized access'})
     
-    # Check if professor is assigned to any schedules
-    schedules = execute_query("""
-        SELECT COUNT(*) as count FROM LAB_SCHEDULES WHERE PROFESSOR_ID = %s
-    """, (professor_id,))
-    
-    if schedules and schedules[0]['count'] > 0:
-        return jsonify({'error': 'Cannot delete professor with assigned schedules'}), 400
-    
-    result = execute_query("""
-        DELETE FROM PROFESSORS WHERE PROFESSOR_ID = %s
-    """, (professor_id,))
-    
-    if result is not None:
-        return jsonify({'message': 'Professor deleted successfully'})
-    return jsonify({'error': 'Failed to delete professor'}), 500
+    try:
+        # Check if professor is assigned to any schedules
+        schedules = execute_query("""
+            SELECT COUNT(*) as count 
+            FROM LAB_SCHEDULES 
+            WHERE PROFESSOR_ID = %s
+        """, (professor_id,))
+        
+        if schedules and schedules[0]['count'] > 0:
+            return jsonify({
+                'success': False, 
+                'message': 'Cannot delete professor. They are assigned to existing schedules.'
+            })
+        
+        # Delete professor
+        execute_query("""
+            DELETE FROM PROFESSORS 
+            WHERE PROFESSOR_ID = %s
+        """, (professor_id,))
+        
+        return jsonify({'success': True, 'message': 'Professor deleted successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
 
 @admin_bp.route('/handle-reservation/<int:reservation_id>/<action>', methods=['POST'])
 @login_required
