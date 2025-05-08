@@ -106,6 +106,19 @@ def student_reservation():
                 flash('All fields are required', 'error')
                 return redirect(url_for('reservation.student_reservation'))
 
+            # Check if student has any pending reservations
+            pending_check_query = """
+            SELECT COUNT(*) as count
+            FROM RESERVATIONS
+            WHERE USER_IDNO = %s
+            AND STATUS = 'PENDING'
+            """
+            pending_result = execute_query(pending_check_query, (session['user_id'],))
+
+            if pending_result[0]['count'] > 0:
+                flash('You already have a pending reservation. Please wait for it to be processed before making another reservation.', 'error')
+                return redirect(url_for('reservation.student_reservation'))
+
             # Check if student already has a reservation for this time
             check_query = """
             SELECT COUNT(*) as count
@@ -188,10 +201,21 @@ def student_reservation():
     limits = execute_query(limits_query, (session['user_id'],))
     student_limits = limits[0] if limits else {'current_points': 0, 'remaining_sessions': 0}
 
+    # Check if student has any pending reservations
+    pending_check_query = """
+    SELECT COUNT(*) as count
+    FROM RESERVATIONS
+    WHERE USER_IDNO = %s
+    AND STATUS = 'PENDING'
+    """
+    pending_result = execute_query(pending_check_query, (session['user_id'],))
+    has_pending_reservation = pending_result[0]['count'] > 0
+
     return render_template('student/reservation.html',
                          labs=labs,
                          purposes=purposes,
-                         student_limits=student_limits)
+                         student_limits=student_limits,
+                         has_pending_reservation=has_pending_reservation)
 
 @reservation_bp.route('/student/reservation/history', methods=['GET'])
 @login_required

@@ -4,6 +4,37 @@
 
 {% block content %}
 <div class="container-fluid">
+    <!-- Pending Reservations Alert -->
+    {% if stats.pending_reservations > 0 %}
+    <div class="alert alert-warning alert-dismissible fade show mb-4" role="alert">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-clock fa-2x me-3"></i>
+            <div>
+                <h4 class="alert-heading mb-2">Pending Reservations</h4>
+                <p class="mb-0">You have {{ stats.pending_reservations }} pending reservation{% if stats.pending_reservations != 1 %}s{% endif %} that need{% if stats.pending_reservations == 1 %}s{% endif %} your attention.</p>
+                {% if pending_reservations %}
+                <hr>
+                <div class="recent-pending">
+                    <p class="mb-2"><strong>Recent pending reservations:</strong></p>
+                    <ul class="list-unstyled">
+                        {% for res in pending_reservations %}
+                        <li class="mb-2">
+                            <i class="fas fa-user-clock me-2"></i>
+                            {{ res.student_name }} - {{ res.LAB_NAME }} on {{ res.formatted_date }} at {{ res.formatted_time }}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                <a href="{{ url_for('admin.manage_reservations') }}" class="btn btn-warning btn-sm mt-2">
+                    <i class="fas fa-list-ul me-1"></i> View All Reservations
+                </a>
+            </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+
     <!-- Welcome Section -->
     <div class="welcome-section mb-4">
         <div class="welcome-content">

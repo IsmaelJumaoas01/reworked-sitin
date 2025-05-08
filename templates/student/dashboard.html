@@ -3,7 +3,28 @@
 {% block title %}Student Dashboard - Sit-In Management System{% endblock %}
 
 {% block content %}
-<div class="dashboard-container">
+<div class="container-fluid">
+    <!-- Reservation Status Alerts -->
+    {% if recent_reservations %}
+    <div class="reservation-alerts mb-4">
+        {% for reservation in recent_reservations %}
+        <div class="alert alert-{{ 'success' if reservation.STATUS == 'APPROVED' else 'danger' }} alert-dismissible fade show" role="alert">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-{{ 'check-circle' if reservation.STATUS == 'APPROVED' else 'times-circle' }} fa-2x me-3"></i>
+                <div>
+                    <h4 class="alert-heading mb-2">Reservation {{ reservation.STATUS.title() }}</h4>
+                    <p class="mb-0">
+                        Your reservation for {{ reservation.LAB_NAME }} on {{ reservation.formatted_date }} at {{ reservation.formatted_time }} has been {{ reservation.STATUS.lower() }}.
+                    </p>
+                    <small class="text-muted">Updated on {{ reservation.updated_at }}</small>
+                </div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <!-- Welcome Section -->
     <div class="welcome-section mb-4">
         <div class="welcome-content">

@@ -91,6 +91,28 @@ def dashboard():
             announcements = []
         print(f"Found {len(announcements)} active announcements")
         
+        # Get recent reservation status updates
+        print("\nFetching recent reservation updates...")
+        reservations_query = """
+        SELECT 
+            r.RESERVATION_ID,
+            r.STATUS,
+            l.LAB_NAME,
+            DATE_FORMAT(r.RESERVATION_DATE, '%M %d, %Y') as formatted_date,
+            DATE_FORMAT(r.TIME_IN, '%h:%i %p') as formatted_time,
+            DATE_FORMAT(r.UPDATED_AT, '%M %d, %Y %h:%i %p') as updated_at
+        FROM RESERVATIONS r
+        JOIN LABORATORIES l ON r.LAB_ID = l.LAB_ID
+        WHERE r.USER_IDNO = %s
+        AND r.STATUS IN ('APPROVED', 'DENIED')
+        AND r.UPDATED_AT >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+        ORDER BY r.UPDATED_AT DESC
+        """
+        recent_reservations = execute_query(reservations_query, (session['user_id'],))
+        if recent_reservations is None:
+            recent_reservations = []
+        print(f"Found {len(recent_reservations)} recent reservation updates")
+        
         print("\nRendering dashboard template...")
         return render_template('student/dashboard.html',
                              sit_in_records=sit_in_records,
@@ -98,7 +120,8 @@ def dashboard():
                              max_sit_ins=max_sit_ins,
                              remaining_sessions=remaining_sessions,
                              stats=stats,
-                             announcements=announcements)
+                             announcements=announcements,
+                             recent_reservations=recent_reservations)
     except Exception as e:
         print(f"\nError in student dashboard: {str(e)}")
         print("Stack trace:", e.__traceback__)

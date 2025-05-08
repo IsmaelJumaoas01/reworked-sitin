@@ -76,7 +76,8 @@ def dashboard():
             (SELECT COUNT(*) FROM USERS WHERE USER_TYPE = 'STUDENT') as total_students,
             (SELECT COUNT(*) FROM SIT_IN_RECORDS WHERE SESSION = 'ON_GOING') as active_sit_ins,
             (SELECT COUNT(*) FROM LABORATORIES) as total_labs,
-            (SELECT COUNT(*) FROM PURPOSES) as total_purposes
+            (SELECT COUNT(*) FROM PURPOSES) as total_purposes,
+            (SELECT COUNT(*) FROM RESERVATIONS WHERE STATUS = 'PENDING') as pending_reservations
         """
         stats = execute_query(stats_query)[0]
 
@@ -161,6 +162,23 @@ def dashboard():
         """
         announcements = execute_query(announcement_query)
 
+        # Get pending reservations for alert
+        pending_reservations_query = """
+        SELECT 
+            r.RESERVATION_ID,
+            CONCAT(u.FIRSTNAME, ' ', u.LASTNAME) as student_name,
+            l.LAB_NAME,
+            DATE_FORMAT(r.RESERVATION_DATE, '%M %d, %Y') as formatted_date,
+            DATE_FORMAT(r.TIME_IN, '%h:%i %p') as formatted_time
+        FROM RESERVATIONS r
+        JOIN USERS u ON r.USER_IDNO = u.IDNO
+        JOIN LABORATORIES l ON r.LAB_ID = l.LAB_ID
+        WHERE r.STATUS = 'PENDING'
+        ORDER BY r.RESERVATION_DATE ASC, r.TIME_IN ASC
+        LIMIT 5
+        """
+        pending_reservations = execute_query(pending_reservations_query)
+
         return render_template('admin/dashboard.html',
                              stats=stats,
                              lab_labels=lab_labels,
@@ -169,7 +187,8 @@ def dashboard():
                              purpose_data=purpose_data,
                              recent_sit_ins=recent_sit_ins,
                              recent_feedback=recent_feedback,
-                             announcements=announcements)
+                             announcements=announcements,
+                             pending_reservations=pending_reservations)
     except Exception as e:
         print(f"Error in admin dashboard: {str(e)}")
         return render_template('error.html', 
@@ -1199,21 +1218,117 @@ def start_sit_in():
 @role_required('ADMIN')
 def end_sit_in(record_id):
     try:
+        print("\n=== Starting End Sit-in Process ===")
+        data = request.get_json()
+        end_option = data.get('end_option')
+        print(f"End option selected: {end_option}")
+        
         # Get the sit-in record
         record_query = """
-        SELECT USER_IDNO, SESSION, COMPUTER_ID, USE_POINTS
-        FROM SIT_IN_RECORDS
-        WHERE RECORD_ID = %s
+        SELECT sr.USER_IDNO, sr.SESSION, sr.COMPUTER_ID, sr.USE_POINTS,
+               COALESCE(sp.CURRENT_POINTS, 0) as current_points,
+               COALESCE(sl.MAX_SIT_INS - sl.SIT_IN_COUNT, 0) as remaining_sessions,
+               sl.SIT_IN_COUNT,
+               sl.MAX_SIT_INS
+        FROM SIT_IN_RECORDS sr
+        LEFT JOIN STUDENT_POINTS sp ON sr.USER_IDNO = sp.USER_IDNO
+        LEFT JOIN SIT_IN_LIMITS sl ON sr.USER_IDNO = sl.USER_IDNO
+        WHERE sr.RECORD_ID = %s
         """
         record = execute_query(record_query, (record_id,))
         
         if not record:
+            print("Error: Sit-in record not found")
             return jsonify({'success': False, 'message': 'Sit-in record not found'}), 404
         
+        print("\nInitial State:")
+        print(f"Student ID: {record[0]['USER_IDNO']}")
+        print(f"Current Points: {record[0]['current_points']}")
+        print(f"Remaining Sessions: {record[0]['remaining_sessions']}")
+        print(f"Sit-in Count: {record[0]['SIT_IN_COUNT']}")
+        print(f"Max Sit-ins: {record[0]['MAX_SIT_INS']}")
+        
         if record[0]['SESSION'] != 'ON_GOING':
+            print("Error: Session is already ended")
             return jsonify({'success': False, 'message': 'Sit-in session is already ended'}), 400
         
-        # Update sit-in session status
+        current_points = record[0]['current_points']
+        remaining_sessions = record[0]['remaining_sessions']
+        sit_in_count = record[0]['SIT_IN_COUNT']
+        max_sit_ins = record[0]['MAX_SIT_INS']
+        
+        if end_option in ['earn_point', 'use_session_and_point']:  # Handle both possible option values
+            print("\nProcessing 'Use Session & Earn Point' option")
+            
+            # Check remaining sessions
+            if remaining_sessions <= 0:
+                print("Error: No remaining sessions available")
+                return jsonify({'success': False, 'message': 'No remaining sessions available'}), 400
+            
+            print("Step 1: Updating sit-in count")
+            # Update sit-in count
+            update_count_query = """
+            UPDATE SIT_IN_LIMITS
+            SET SIT_IN_COUNT = SIT_IN_COUNT + 1
+            WHERE USER_IDNO = %s
+            """
+            execute_query(update_count_query, (record[0]['USER_IDNO'],))
+            print(f"Increased sit-in count by 1 (was: {sit_in_count})")
+            
+            print("\nStep 2: Adding point")
+            # Check if student has a points record
+            check_points_query = """
+            SELECT COUNT(*) as count
+            FROM STUDENT_POINTS
+            WHERE USER_IDNO = %s
+            """
+            points_result = execute_query(check_points_query, (record[0]['USER_IDNO'],))
+            
+            if points_result[0]['count'] == 0:
+                print("Creating initial points record")
+                insert_points_query = """
+                INSERT INTO STUDENT_POINTS (USER_IDNO, CURRENT_POINTS, TOTAL_POINTS)
+                VALUES (%s, 1, 1)
+                """
+                execute_query(insert_points_query, (record[0]['USER_IDNO'],))
+            else:
+                print("Updating existing points record")
+                points_query = """
+                UPDATE STUDENT_POINTS 
+                SET CURRENT_POINTS = CURRENT_POINTS + 1,
+                    TOTAL_POINTS = TOTAL_POINTS + 1
+                WHERE USER_IDNO = %s
+                """
+                execute_query(points_query, (record[0]['USER_IDNO'],))
+            
+            print("\nStep 3: Recording point history")
+            history_query = """
+            INSERT INTO POINT_HISTORY (USER_IDNO, POINTS_CHANGE, REASON, ADDED_BY)
+            VALUES (%s, 1, 'Completed sit-in session with point reward', %s)
+            """
+            execute_query(history_query, (record[0]['USER_IDNO'], session['user_id']))
+            
+            print("\nStep 4: Checking for extra session eligibility")
+            new_points = current_points + 1
+            print(f"New points total: {new_points}")
+            
+            if new_points % 3 == 0:
+                print(f"Points reached multiple of 3 ({new_points}), adding extra session")
+                update_sessions_query = """
+                UPDATE SIT_IN_LIMITS 
+                SET SIT_IN_COUNT = SIT_IN_COUNT - 1
+                WHERE USER_IDNO = %s
+                """
+                execute_query(update_sessions_query, (record[0]['USER_IDNO'],))
+                
+                history_query = """
+                INSERT INTO POINT_HISTORY (USER_IDNO, POINTS_CHANGE, REASON, ADDED_BY)
+                VALUES (%s, 0, 'Earned extra session for reaching %s points', %s)
+                """
+                execute_query(history_query, (record[0]['USER_IDNO'], new_points, session['user_id']))
+                print("Extra session added")
+        
+        print("\nStep 5: Updating sit-in record status")
         update_query = """
         UPDATE SIT_IN_RECORDS
         SET SESSION = 'COMPLETED',
@@ -1223,69 +1338,7 @@ def end_sit_in(record_id):
         """
         execute_query(update_query, (record_id,))
         
-        # If not using points, update sit-in count for the student
-        if not record[0]['USE_POINTS']:
-            # Get current sit-in count and max limit
-            limits_query = """
-            SELECT SIT_IN_COUNT, MAX_SIT_INS
-            FROM SIT_IN_LIMITS
-            WHERE USER_IDNO = %s
-            """
-            limits_result = execute_query(limits_query, (record[0]['USER_IDNO'],))
-            
-            if not limits_result:
-                # Create initial record if it doesn't exist
-                insert_limits_query = """
-                INSERT INTO SIT_IN_LIMITS (USER_IDNO, SIT_IN_COUNT, MAX_SIT_INS)
-                VALUES (%s, 1, 30)
-                """
-                execute_query(insert_limits_query, (record[0]['USER_IDNO'],))
-            else:
-                # Update existing record by increasing the count
-                current_count = limits_result[0]['SIT_IN_COUNT']
-                max_limit = limits_result[0]['MAX_SIT_INS']
-                
-                if current_count < max_limit:
-                    update_count_query = """
-                    UPDATE SIT_IN_LIMITS
-                    SET SIT_IN_COUNT = SIT_IN_COUNT + 1
-                    WHERE USER_IDNO = %s
-                    """
-                    execute_query(update_count_query, (record[0]['USER_IDNO'],))
-        
-        # Check if student has a record in STUDENT_POINTS
-        check_points_query = """
-        SELECT COUNT(*) as count
-        FROM STUDENT_POINTS
-        WHERE USER_IDNO = %s
-        """
-        points_result = execute_query(check_points_query, (record[0]['USER_IDNO'],))
-        
-        if points_result[0]['count'] == 0:
-            # Create initial record if it doesn't exist
-            insert_points_query = """
-            INSERT INTO STUDENT_POINTS (USER_IDNO, CURRENT_POINTS, TOTAL_POINTS)
-            VALUES (%s, 1, 1)
-            """
-            execute_query(insert_points_query, (record[0]['USER_IDNO'],))
-        else:
-            # Update existing record
-            points_query = """
-            UPDATE STUDENT_POINTS 
-            SET CURRENT_POINTS = CURRENT_POINTS + 1,
-                TOTAL_POINTS = TOTAL_POINTS + 1
-            WHERE USER_IDNO = %s
-            """
-            execute_query(points_query, (record[0]['USER_IDNO'],))
-        
-        # Add to point history
-        history_query = """
-        INSERT INTO POINT_HISTORY (USER_IDNO, POINTS_CHANGE, REASON, ADDED_BY)
-        VALUES (%s, 1, 'Completed sit-in session', %s)
-        """
-        execute_query(history_query, (record[0]['USER_IDNO'], session['user_id']))
-        
-        # Update computer status back to available
+        print("\nStep 6: Updating computer status")
         update_computer_query = """
         UPDATE COMPUTERS
         SET STATUS = 'available'
@@ -1293,9 +1346,37 @@ def end_sit_in(record_id):
         """
         execute_query(update_computer_query, (record[0]['COMPUTER_ID'],))
         
-        return jsonify({'success': True, 'message': 'Sit-in session ended successfully'})
+        print("\nStep 7: Getting updated information")
+        updated_info_query = """
+        SELECT 
+            COALESCE(sp.CURRENT_POINTS, 0) as current_points,
+            COALESCE(sl.MAX_SIT_INS - sl.SIT_IN_COUNT, 0) as remaining_sessions,
+            sl.SIT_IN_COUNT as new_sit_in_count
+        FROM USERS u
+        LEFT JOIN STUDENT_POINTS sp ON u.IDNO = sp.USER_IDNO
+        LEFT JOIN SIT_IN_LIMITS sl ON u.IDNO = sl.USER_IDNO
+        WHERE u.IDNO = %s
+        """
+        updated_info = execute_query(updated_info_query, (record[0]['USER_IDNO'],))[0]
+        
+        print("\nFinal State:")
+        print(f"New Current Points: {updated_info['current_points']}")
+        print(f"New Remaining Sessions: {updated_info['remaining_sessions']}")
+        print(f"New Sit-in Count: {updated_info['new_sit_in_count']}")
+        print("=== End Sit-in Process Complete ===\n")
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Sit-in session ended successfully',
+            'current_points': updated_info['current_points'],
+            'remaining_sessions': updated_info['remaining_sessions']
+        })
     except Exception as e:
-        print(f"Error in end_sit_in: {str(e)}")  # Add error logging
+        print(f"\nERROR in end_sit_in: {str(e)}")
+        print("Stack trace:")
+        import traceback
+        traceback.print_exc()
+        print("=== End Sit-in Process Failed ===\n")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @admin_bp.route('/sit-in-records')
@@ -1306,7 +1387,6 @@ def sit_in_records():
     per_page = 10
     lab_id = request.args.get('lab_id', type=int)
     purpose_id = request.args.get('purpose_id', type=int)
-    status = request.args.get('status')
     
     # Build the base query
     base_query = """
@@ -1317,12 +1397,19 @@ def sit_in_records():
         u.COURSE,
         u.YEAR,
         l.LAB_NAME,
-        p.PURPOSE_NAME
+        p.PURPOSE_NAME,
+        DATE_FORMAT(sr.TIME_IN, '%h:%i %p') as formatted_time_in,
+        DATE_FORMAT(sr.TIME_OUT, '%h:%i %p') as formatted_time_out,
+        CASE
+            WHEN sr.TIME_OUT IS NOT NULL THEN
+                TIMESTAMPDIFF(MINUTE, sr.TIME_IN, sr.TIME_OUT)
+            ELSE NULL
+        END as duration_minutes
     FROM SIT_IN_RECORDS sr
     JOIN USERS u ON sr.USER_IDNO = u.IDNO
     JOIN LABORATORIES l ON sr.LAB_ID = l.LAB_ID
     JOIN PURPOSES p ON sr.PURPOSE_ID = p.PURPOSE_ID
-    WHERE 1=1
+    WHERE sr.SESSION = 'COMPLETED'
     """
     
     # Add filters if provided
@@ -1333,9 +1420,6 @@ def sit_in_records():
     if purpose_id:
         base_query += " AND sr.PURPOSE_ID = %s"
         params.append(purpose_id)
-    if status:
-        base_query += " AND sr.SESSION = %s"
-        params.append(status)
     
     # Get total count with filters
     count_query = f"SELECT COUNT(*) as total FROM ({base_query}) as filtered"
@@ -1350,6 +1434,15 @@ def sit_in_records():
     
     # Get paginated records
     records = execute_query(base_query, tuple(params))
+    
+    # Format duration for each record
+    for record in records:
+        if record['duration_minutes'] is not None:
+            hours = record['duration_minutes'] // 60
+            minutes = record['duration_minutes'] % 60
+            record['formatted_duration'] = f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
+        else:
+            record['formatted_duration'] = 'N/A'
     
     # Get all labs and purposes for filter dropdowns
     labs = execute_query("SELECT LAB_ID, LAB_NAME FROM LABORATORIES ORDER BY LAB_NAME")
@@ -1491,6 +1584,7 @@ def download_report(report_type, format):
                 SELECT l.LAB_NAME AS lab_name, COUNT(s.RECORD_ID) as usage_count
                 FROM LABORATORIES l
                 LEFT JOIN SIT_IN_RECORDS s ON l.LAB_ID = s.LAB_ID
+                WHERE s.SESSION = 'COMPLETED'
                 GROUP BY l.LAB_NAME
                 ORDER BY usage_count DESC
             """
@@ -1499,98 +1593,65 @@ def download_report(report_type, format):
             
         elif report_type == 'purpose_usage':
             query = """
-                SELECT p.PURPOSE_NAME as purpose_name, COUNT(s.RECORD_ID) as usage_count
+                SELECT p.PURPOSE_NAME AS purpose_name, COUNT(s.RECORD_ID) as usage_count
                 FROM PURPOSES p
-                JOIN SIT_IN_RECORDS s ON p.PURPOSE_ID = s.PURPOSE_ID
+                LEFT JOIN SIT_IN_RECORDS s ON p.PURPOSE_ID = s.PURPOSE_ID
+                WHERE s.SESSION = 'COMPLETED'
                 GROUP BY p.PURPOSE_NAME
-                HAVING usage_count > 0
                 ORDER BY usage_count DESC
             """
-            headers = ['purpose_name', 'usage_count']
+            headers = ['Purpose', 'Usage Count']
             filename = 'purpose_usage_report'
             
         elif report_type == 'sit_ins':
-            # Get filter parameters from request
-            lab_id = request.args.get('lab_id')
-            purpose_id = request.args.get('purpose_id')
-            start_date = request.args.get('start_date')
-            end_date = request.args.get('end_date')
-            
-            # Build the query with filters
             query = """
                 SELECT 
-                    s.RECORD_ID as record_id,
+                    sr.RECORD_ID as record_id,
                     CONCAT(u.FIRSTNAME, ' ', u.LASTNAME) as student_name,
                     u.COURSE as course,
                     u.YEAR as year,
                     l.LAB_NAME as lab,
                     p.PURPOSE_NAME as purpose,
-                    DATE_FORMAT(s.CREATED_AT, '%Y-%m-%d') as date,
-                    TIME_FORMAT(s.TIME_IN, '%H:%i') as time_in,
-                    TIME_FORMAT(s.TIME_OUT, '%H:%i') as time_out,
-                    s.STATUS as status,
-                    s.SESSION as session
-                FROM SIT_IN_RECORDS s
-                JOIN USERS u ON s.USER_IDNO = u.IDNO
-                JOIN LABORATORIES l ON s.LAB_ID = l.LAB_ID
-                JOIN PURPOSES p ON s.PURPOSE_ID = p.PURPOSE_ID
-                WHERE 1=1
+                    DATE_FORMAT(sr.DATE, '%Y-%m-%d') as date,
+                    DATE_FORMAT(sr.TIME_IN, '%h:%i %p') as time_in,
+                    DATE_FORMAT(sr.TIME_OUT, '%h:%i %p') as time_out,
+                    sr.STATUS as status,
+                    sr.SESSION as session
+                FROM SIT_IN_RECORDS sr
+                JOIN USERS u ON sr.USER_IDNO = u.IDNO
+                JOIN LABORATORIES l ON sr.LAB_ID = l.LAB_ID
+                JOIN PURPOSES p ON sr.PURPOSE_ID = p.PURPOSE_ID
+                WHERE sr.SESSION = 'COMPLETED'
+                ORDER BY sr.CREATED_AT DESC
             """
-            
-            params = []
-            if lab_id:
-                query += " AND s.LAB_ID = %s"
-                params.append(lab_id)
-            if purpose_id:
-                query += " AND s.PURPOSE_ID = %s"
-                params.append(purpose_id)
-            if start_date:
-                query += " AND DATE(s.CREATED_AT) >= %s"
-                params.append(start_date)
-            if end_date:
-                query += " AND DATE(s.CREATED_AT) <= %s"
-                params.append(end_date)
-                
-            query += " ORDER BY s.CREATED_AT DESC"
-            
-            headers = ['record_id', 'student_name', 'course', 'year', 'lab', 'purpose', 'date', 'time_in', 'time_out', 'status', 'session']
+            headers = ['Record ID', 'Student Name', 'Course', 'Year', 'Lab', 'Purpose', 'Date', 'Time In', 'Time Out', 'Status', 'Session']
             filename = 'sit_in_records_report'
             
         elif report_type == 'feedback':
             query = """
                 SELECT 
-                    f.FEEDBACK_ID as feedback_id,
-                    f.RECORD_ID as record_id,
                     CONCAT(u.FIRSTNAME, ' ', u.LASTNAME) as student_name,
-                    u.COURSE as course,
-                    u.YEAR as year,
-                    l.LAB_NAME as lab,
-                    p.PURPOSE_NAME as purpose,
+                    l.LAB_NAME as lab_name,
+                    p.PURPOSE_NAME as purpose_name,
                     f.RATING as rating,
                     f.COMMENT as comment,
-                    DATE_FORMAT(f.CREATED_AT, '%Y-%m-%d %H:%i') as date
+                    DATE_FORMAT(sr.CREATED_AT, '%Y-%m-%d %H:%i') as sit_in_date
                 FROM FEEDBACKS f
-                JOIN SIT_IN_RECORDS s ON f.RECORD_ID = s.RECORD_ID
+                JOIN SIT_IN_RECORDS sr ON f.RECORD_ID = sr.RECORD_ID
                 JOIN USERS u ON f.USER_IDNO = u.IDNO
-                JOIN LABORATORIES l ON s.LAB_ID = l.LAB_ID
-                JOIN PURPOSES p ON s.PURPOSE_ID = p.PURPOSE_ID
-                ORDER BY f.CREATED_AT DESC
+                JOIN LABORATORIES l ON sr.LAB_ID = l.LAB_ID
+                JOIN PURPOSES p ON sr.PURPOSE_ID = p.PURPOSE_ID
+                WHERE sr.SESSION = 'COMPLETED'
+                ORDER BY sr.CREATED_AT DESC
             """
-            headers = ['feedback_id', 'record_id', 'student_name', 'course', 'year', 'lab', 'purpose', 'rating', 'comment', 'date']
+            headers = ['Student Name', 'Lab', 'Purpose', 'Rating', 'Comment', 'Date']
             filename = 'feedback_report'
             
         else:
             return jsonify({'error': 'Invalid report type'}), 400
-            
-        # Execute query with parameters if needed
-        if report_type == 'sit_ins' and params:
-            data = execute_query(query, tuple(params))
-        else:
-            data = execute_query(query)
-            
-        if not data:
-            data = []
-            
+        
+        data = execute_query(query)
+        
         if format == 'csv':
             return generate_csv_report(data, headers, filename)
         elif format == 'pdf':
@@ -1601,7 +1662,6 @@ def download_report(report_type, format):
             return jsonify({'error': 'Invalid format'}), 400
             
     except Exception as e:
-        print(f"Error generating report: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 def generate_csv_report(data, headers, title):
@@ -2259,10 +2319,11 @@ def add_points():
     try:
         data = request.get_json()
         student_id = data.get('student_id')
-        points = data.get('points')
+        points = data.get('points', 1)  # Default to 1 point if not specified
         reason = data.get('reason')
+        record_id = data.get('record_id')
 
-        if not all([student_id, points, reason]):
+        if not all([student_id, reason]):
             return jsonify({'error': 'Missing required fields'}), 400
 
         # Update student points
@@ -2280,6 +2341,14 @@ def add_points():
         VALUES (%s, %s, %s, %s)
         """
         execute_query(history_query, (student_id, points, reason, session['user_id']))
+
+        # If record_id is provided, add to point redemptions
+        if record_id:
+            redemption_query = """
+            INSERT INTO POINT_REDEMPTIONS (USER_IDNO, SIT_IN_RECORD_ID, POINTS_USED)
+            VALUES (%s, %s, %s)
+            """
+            execute_query(redemption_query, (student_id, record_id, points))
 
         return jsonify({'success': True, 'message': 'Points added successfully'})
     except Exception as e:
@@ -3351,7 +3420,8 @@ def handle_reservation(reservation_id, action):
         # Update reservation status
         execute_query("""
             UPDATE RESERVATIONS 
-            SET STATUS = %s 
+            SET STATUS = %s,
+                UPDATED_AT = NOW()
             WHERE RESERVATION_ID = %s
         """, (status, reservation_id))
         
@@ -3364,15 +3434,16 @@ def handle_reservation(reservation_id, action):
             )
             
             # Set initial sit-in status based on time
-            sit_in_status = 'APPROVED' if current_time >= reservation_datetime else 'PENDING'
-            sit_in_session = 'ON_GOING' if current_time >= reservation_datetime else 'PENDING'
+            sit_in_status = 'APPROVED'
+            sit_in_session = 'ON_GOING'
             
             # Create sit-in record
             sit_in_query = """
             INSERT INTO SIT_IN_RECORDS (
                 USER_IDNO, LAB_ID, COMPUTER_ID, PURPOSE_ID,
-                DATE, TIME_IN, STATUS, SESSION, USE_POINTS
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                DATE, TIME_IN, STATUS, SESSION, USE_POINTS,
+                CREATED_AT
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
             """
             execute_query(sit_in_query, (
                 reservation['USER_IDNO'],
@@ -3408,13 +3479,12 @@ def handle_reservation(reservation_id, action):
                     WHERE USER_IDNO = %s
                 """, (reservation['USER_IDNO'],))
             
-            # If the sit-in is starting now, update computer status
-            if sit_in_session == 'ON_GOING':
-                execute_query("""
-                    UPDATE COMPUTERS
-                    SET STATUS = 'in_use'
-                    WHERE COMPUTER_ID = %s
-                """, (reservation['COMPUTER_ID'],))
+            # Update computer status
+            execute_query("""
+                UPDATE COMPUTERS
+                SET STATUS = 'in_use'
+                WHERE COMPUTER_ID = %s
+            """, (reservation['COMPUTER_ID'],))
         
         return jsonify({
             'success': True,
@@ -3435,7 +3505,7 @@ def manage_reservations():
         date = request.args.get('date')
         lab_id = request.args.get('lab_id')
         
-        # Build query conditions
+        # Base query conditions
         conditions = []
         params = []
         
@@ -3454,8 +3524,8 @@ def manage_reservations():
         # Build the WHERE clause
         where_clause = " AND ".join(conditions) if conditions else "1=1"
         
-        # Get reservations with detailed information
-        query = f"""
+        # Get pending reservations
+        pending_query = f"""
         SELECT 
             r.*,
             l.LAB_NAME,
@@ -3472,23 +3542,40 @@ def manage_reservations():
         JOIN PURPOSES p ON r.PURPOSE_ID = p.PURPOSE_ID
         JOIN COMPUTERS c ON r.COMPUTER_ID = c.COMPUTER_ID
         JOIN USERS u ON r.USER_IDNO = u.IDNO
-        WHERE {where_clause}
-        ORDER BY 
-            CASE 
-                WHEN r.STATUS = 'PENDING' THEN 1
-                WHEN r.STATUS = 'APPROVED' THEN 2
-                ELSE 3
-            END,
-            r.RESERVATION_DATE ASC,
-            r.TIME_IN ASC
+        WHERE {where_clause} AND r.STATUS = 'PENDING'
+        ORDER BY r.RESERVATION_DATE ASC, r.TIME_IN ASC
         """
-        reservations = execute_query(query, tuple(params))
+        pending_reservations = execute_query(pending_query, tuple(params))
+        
+        # Get completed reservations (approved/denied)
+        completed_query = f"""
+        SELECT 
+            r.*,
+            l.LAB_NAME,
+            p.PURPOSE_NAME,
+            c.COMPUTER_NUMBER,
+            u.FIRSTNAME,
+            u.LASTNAME,
+            u.COURSE,
+            u.YEAR,
+            DATE_FORMAT(r.CREATED_AT, '%Y-%m-%d %H:%i') as CREATED_TIME,
+            DATE_FORMAT(r.TIME_IN, '%h:%i %p') as FORMATTED_TIME
+        FROM RESERVATIONS r
+        JOIN LABORATORIES l ON r.LAB_ID = l.LAB_ID
+        JOIN PURPOSES p ON r.PURPOSE_ID = p.PURPOSE_ID
+        JOIN COMPUTERS c ON r.COMPUTER_ID = c.COMPUTER_ID
+        JOIN USERS u ON r.USER_IDNO = u.IDNO
+        WHERE {where_clause} AND r.STATUS IN ('APPROVED', 'DENIED')
+        ORDER BY r.UPDATED_AT DESC
+        """
+        completed_reservations = execute_query(completed_query, tuple(params))
         
         # Get labs for filter
         labs = execute_query("SELECT * FROM LABORATORIES WHERE STATUS = 'active' ORDER BY LAB_NAME")
         
         return render_template('admin/reservations.html',
-                             reservations=reservations,
+                             pending_reservations=pending_reservations,
+                             completed_reservations=completed_reservations,
                              labs=labs,
                              current_status=status,
                              current_date=date,

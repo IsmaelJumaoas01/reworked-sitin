@@ -453,10 +453,16 @@ def insert_sample_sit_in_records():
                     """
                     execute_query(history_query, (user['IDNO'], user['IDNO']))
         
-        # Insert sample reservations for future dates
+        # Insert sample reservations for future dates (ensuring no multiple pending reservations)
         print("\n=== Inserting Sample Reservations ===")
-        for date in future_dates:
-            for user in users:
+        for user in users:
+            # Only create one pending reservation per student
+            has_pending = False
+            
+            for date in future_dates:
+                if has_pending:
+                    break
+                    
                 # Randomly select lab, purpose, and computer
                 lab = random.choice(labs)
                 purpose = random.choice(purposes)
@@ -469,6 +475,10 @@ def insert_sample_sit_in_records():
                 # Randomly decide if this will be a pending or approved reservation
                 status = random.choice(['PENDING', 'APPROVED'])
                 use_points = random.choice([True, False])
+                
+                # If status is PENDING, mark that this student now has a pending reservation
+                if status == 'PENDING':
+                    has_pending = True
                 
                 # Check if student has enough points if using points
                 if use_points:
